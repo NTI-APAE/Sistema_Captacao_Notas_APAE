@@ -1,0 +1,52 @@
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
+
+# Dependências e ambientes
+node_modules/
+.pnpm-store/
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+
+# Artefatos de build, testes e cobertura
+.next/
+out/
+dist/
+build/
+coverage/
+htmlcov/
+.coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+
+# Dados e arquivos de execução locais
+*.sqlite
+*.sqlite3
+*.db
+*.log
+logs/
+data/
+uploads/
+
+# Arquivos do sistema e IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Lockfile solto, sem projeto Node na raiz
+/package-lock.json
