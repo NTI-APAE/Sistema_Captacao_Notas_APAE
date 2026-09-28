@@ -1,0 +1,100 @@
+export type SearchParams = Record<string, string | string[] | undefined>;
+export type Query = Record<string, string>;
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+// Na listagem, telefone/chave já chegam mascarados pela API.
+export interface Note {
+  id: string;
+  data_recebimento: string;
+  status: string;
+  origem: string;
+  pessoa_id: string | null;
+  nome: string | null;
+  telefone: string | null;
+  chave: string | null;
+  cadastro: string | null;
+}
+
+export interface NoteDetail extends Note {
+  nota_fiscal_id: string | null;
+  mensagem_whatsapp_id: string | null;
+  erro_codigo: string | null;
+  data_cadastro: string | null;
+  valor: string | null;
+  data_emissao: string | null;
+}
+
+export interface Contact {
+  id: string;
+  nome: string | null;
+  telefone: string;
+  ativo: boolean;
+  criado_em: string;
+  primeiro_envio: string | null;
+  ultimo_envio: string | null;
+  envios: number;
+  notas: number;
+  comunicacao: boolean | null;
+  ligacao: boolean | null;
+}
+
+export interface Consent {
+  tipo: string;
+  aceito: boolean;
+  origem: string;
+  data_resposta: string;
+}
+
+export interface ContactDetail {
+  contato: Contact;
+  result: Page<Note>;
+  consentimentos: Page<Consent>;
+}
+
+export interface Summary {
+  indicadores: {
+    total: number;
+    hoje: number;
+    mes: number;
+    duplicadas: number;
+    falhas: number;
+    notas: number;
+    cadastradas: number;
+    contatos: number;
+    novos_contatos: number;
+    imagens_sem_chave: number;
+  };
+  series: { dia: string; total: number }[];
+  maximo: number;
+  status_submissoes: [string, number][];
+  status_notas: [string, number][];
+  result: Page<Note>;
+}
+
+export interface Options {
+  status: string[];
+  cadastros: string[];
+}
+
+export type ApiErrorCode =
+  | "authentication_unavailable"
+  | "authentication_required"
+  | "forbidden"
+  | "not_found"
+  | "invalid_filters"
+  | "database_unavailable"
+  | "unavailable"
+  | "invalid_response";
+export interface ApiError {
+  code: ApiErrorCode;
+  status: number;
+}
+export type ApiResult<T> =
+  { ok: true; data: T } | { ok: false; error: ApiError };
