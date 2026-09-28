@@ -1,0 +1,10 @@
+from enum import StrEnum
+
+
+class ExecucaoStatus(StrEnum):
+    PENDENTE = "PENDENTE"
+    EM_EXECUCAO = "EM_EXECUCAO"
+    AGUARDANDO_CAPTCHA = "AGUARDANDO_CAPTCHA"
+    PAUSADA = "PAUSADA"
+    SUCESSO = "SUCESSO"
+    ERRO = "ERRO"

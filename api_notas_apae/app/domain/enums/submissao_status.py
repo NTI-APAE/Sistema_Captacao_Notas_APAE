@@ -1,0 +1,10 @@
+from enum import StrEnum
+
+
+class SubmissaoStatus(StrEnum):
+    RECEBIDA = "RECEBIDA"
+    PROCESSANDO = "PROCESSANDO"
+    CHAVE_EXTRAIDA = "CHAVE_EXTRAIDA"
+    PENDENTE = "PENDENTE"
+    DUPLICADA = "DUPLICADA"
+    ERRO_LEITURA = "ERRO_LEITURA"

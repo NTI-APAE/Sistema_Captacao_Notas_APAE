@@ -1,0 +1,55 @@
+[project]
+name = "api-notas-apae"
+version = "0.1.0"
+description = "API em camadas para captacao e cadastro de notas fiscais."
+requires-python = ">=3.12"
+dependencies = [
+    "email-validator>=2.2.0,<3",
+    "pwdlib[argon2]>=0.3.0,<1",
+    "tzdata>=2025.1",
+    "alembic>=1.16.0",
+    "numpy>=2,<3",
+    "opencv-python-headless>=4.11,<5",
+    "fastapi>=0.116.0",
+    "psycopg[binary]>=3.2.0",
+    "pydantic-settings>=2.10.0",
+    "sqlalchemy>=2.0.0",
+    "uvicorn[standard]>=0.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=25.0.0",
+    "httpx>=0.28.0",
+    "mypy>=1.17.0",
+    "pytest>=8.4.0",
+    "pytest-cov>=6.2.0",
+    "ruff>=0.12.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["alembic*", "tests*"]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/versions/*.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
