@@ -89,7 +89,8 @@ sem o middleware de autenticação.
 
 - `/`: apresentação pública do sistema;
 - `/login`: autenticação administrativa;
-- `/dashboard`: indicadores, volume dos últimos 30 dias e últimos recebimentos;
+- `/dashboard`: indicadores, volume dos últimos 30 dias, últimos recebimentos e
+  o resumo persistido das operações do leitor;
 - `/dashboard/notas`: filtros e paginação de submissões;
 - `/dashboard/relatorios`: filtros, indicadores, impressão e exportação CSV das notas recebidas;
 - `/dashboard/notas/{submissao_id}`: detalhe do recebimento, metadados da mensagem WhatsApp e histórico de reenvios/duplicidades;

@@ -154,6 +154,29 @@ export default async function ReportsPage({
               </article>
               <article className="metric-card">
                 <div className="metric-label">
+                  <span>Valor total do leitor</span>
+                  <span className="metric-icon blue">
+                    <CircleDollarSign size={17} strokeWidth={1.6} />
+                  </span>
+                </div>
+                <strong>{money(summary.data.leitor.valor_total)}</strong>
+                <p>
+                  {number(summary.data.leitor.operacoes)} operação(ões)
+                  registrada(s)
+                </p>
+              </article>
+              <article className="metric-card">
+                <div className="metric-label">
+                  <span>Valor cadastrado pelo leitor</span>
+                  <span className="metric-icon green">
+                    <ShieldCheck size={17} strokeWidth={1.6} />
+                  </span>
+                </div>
+                <strong>{money(summary.data.leitor.valor_cadastradas)}</strong>
+                <p>Notas concluídas pelo automatizador</p>
+              </article>
+              <article className="metric-card">
+                <div className="metric-label">
                   <span>Valor cadastrado</span>
                   <span className="metric-icon green">
                     <CircleDollarSign size={17} strokeWidth={1.6} />
@@ -175,6 +198,36 @@ export default async function ReportsPage({
                   {money(summary.data.indicadores.retorno_estimado)}
                 </strong>
                 <p>Estimativa de 1% do valor cadastrado</p>
+              </article>
+              <article className="metric-card">
+                <div className="metric-label">
+                  <span>Valor duplicado pelo leitor</span>
+                  <span className="metric-icon amber">
+                    <Copy size={17} strokeWidth={1.6} />
+                  </span>
+                </div>
+                <strong>{money(summary.data.leitor.valor_duplicadas)}</strong>
+                <p>Notas já cadastradas no portal</p>
+              </article>
+              <article className="metric-card">
+                <div className="metric-label">
+                  <span>Valor ignorado pelo leitor</span>
+                  <span className="metric-icon amber">
+                    <Clock3 size={17} strokeWidth={1.6} />
+                  </span>
+                </div>
+                <strong>{money(summary.data.leitor.valor_ignoradas)}</strong>
+                <p>Notas fora das regras de cadastro</p>
+              </article>
+              <article className="metric-card">
+                <div className="metric-label">
+                  <span>Valor com erro no leitor</span>
+                  <span className="metric-icon rose">
+                    <TriangleAlert size={17} strokeWidth={1.6} />
+                  </span>
+                </div>
+                <strong>{money(summary.data.leitor.valor_erros)}</strong>
+                <p>Notas que encerraram com erro</p>
               </article>
               <article className="metric-card">
                 <div className="metric-label">

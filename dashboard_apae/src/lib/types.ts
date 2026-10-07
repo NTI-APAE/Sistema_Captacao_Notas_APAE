@@ -115,7 +115,26 @@ export interface Summary {
   maximo: number;
   status_submissoes: [string, number][];
   status_notas: [string, number][];
+  leitor: ReaderSummary;
   result: Page<Note>;
+}
+
+export interface ReaderSummary {
+  operacoes: number;
+  total_notas: number;
+  tentadas: number;
+  cadastradas: number;
+  duplicadas: number;
+  ignoradas: number;
+  erros: number;
+  valor_total: string;
+  valor_cadastradas: string;
+  valor_duplicadas: string;
+  valor_ignoradas: string;
+  valor_erros: string;
+  tempo_total_segundos: string;
+  tempo_notas_segundos: string;
+  ultima_operacao_em: string | null;
 }
 
 export interface Options {

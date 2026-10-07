@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { dashboardApi } from "@/lib/api";
 import type { Summary } from "@/lib/types";
-import { number } from "@/lib/format";
+import { money, number } from "@/lib/format";
 import {
   ErrorState,
   Notice,
@@ -43,6 +43,7 @@ export default async function DashboardPage() {
     series,
     status_notas,
     status_submissoes,
+    leitor,
     result: recent,
   } = result.data;
   const cards = [
@@ -120,6 +121,29 @@ export default async function DashboardPage() {
           </article>
         ))}
       </section>
+      <Panel
+        title="Resumo das operações do leitor"
+        subtitle="Valores enviados pelo leitor de notas e consolidados pela API."
+      >
+        <section className="summary-strip" aria-label="Valores do leitor">
+          {[
+            ["Operações", number(leitor.operacoes)],
+            ["Notas processadas", number(leitor.total_notas)],
+            ["Valor total", money(leitor.valor_total)],
+            ["Cadastradas", money(leitor.valor_cadastradas)],
+            ["Duplicadas", money(leitor.valor_duplicadas)],
+            ["Ignoradas", money(leitor.valor_ignoradas)],
+            ["Erros", money(leitor.valor_erros)],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <div>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            </div>
+          ))}
+        </section>
+      </Panel>
       <div className="overview-charts">
         <Panel
           title="Notas recebidas por dia"
