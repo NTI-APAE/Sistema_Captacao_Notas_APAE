@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Ambientes virtuais e dependencias locais
+.venv/
+venv/
+env/
+ENV/
+
+# Variaveis locais
+.env
+.env.*
+
+# Banco local gerado pelo sistema
+data/*.db
+data/*.db-*
+data/*.sqlite
+data/*.sqlite3
+
+# Logs e diagnosticos locais
+logs/*.log
+logs/diagnostico/
+logs/**/*.log
+
+# Builds, executaveis e pacotes gerados
+build/
+dist/
+*.zip
+*.exe
+*.msi
+*.spec.bak
+
+# Relatorios/exportacoes geradas pelo usuario
+*.xlsx
+*.xls
+relatorio_notas_*.xlsx
+
+# Caches e metadados de ferramentas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+pip-wheel-metadata/
+
+# Arquivos temporarios do sistema/editor
+*.tmp
+*.temp
+*.bak
+*.swp
+~$*
+.DS_Store
+Thumbs.db
