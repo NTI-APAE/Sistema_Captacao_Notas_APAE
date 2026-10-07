@@ -1,6 +1,7 @@
 """Consultas de leitura: agregações e paginação executadas no banco."""
 
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy import exists, func, literal, null, or_, select, union_all
 
@@ -24,10 +25,22 @@ class AdminReportingRepository:
             or 0
         )
 
-    def indicadores(self, hoje):
+    @staticmethod
+    def _subtrair_meses(data: date, meses: int) -> date:
+        meses_totais = data.year * 12 + data.month - 1 - meses
+        ano, mes_zero = divmod(meses_totais, 12)
+        mes = mes_zero + 1
+        ultimo_dia = (
+            date(ano + (mes == 12), 1 if mes == 12 else mes + 1, 1)
+            - timedelta(days=1)
+        ).day
+        return date(ano, mes, min(data.day, ultimo_dia))
+
+    def indicadores(self, hoje, prazo_maximo_emissao_meses=3):
         inicio = inicio_dia(hoje)
         fim = inicio_dia(hoje + timedelta(days=1))
         mes = inicio_dia(hoje.replace(day=1))
+        limite_prazo = self._subtrair_meses(hoje, prazo_maximo_emissao_meses)
         counts = (
             self.session.execute(
                 select(
@@ -47,12 +60,34 @@ class AdminReportingRepository:
         )
         result = dict(counts)
         result.update(
+            total_geral=self.count(N),
             notas=self.count(N),
             notas_leitor=self.count(
                 N,
                 ~exists().where(S.nota_fiscal_id == N.id),
             ),
+            notas_whatsapp=self.count(
+                N,
+                exists().where(
+                    (S.nota_fiscal_id == N.id) & (S.origem == "WHATSAPP")
+                ),
+            ),
+            notas_erros=self.count(N, N.status == "ERRO_CADASTRO"),
+            notas_ignoradas=self.count(N, N.status == "IGNORADA"),
             cadastradas=self.count(N, N.status == "CADASTRADA"),
+            valor_cadastradas=self._sum(
+                N.valor,
+                N.status == "CADASTRADA",
+            ),
+            retorno_estimado=self._sum(
+                N.valor,
+                N.status == "CADASTRADA",
+            ) * Decimal("0.01"),
+            valor_fora_prazo=self._sum(
+                N.valor,
+                N.data_emissao.is_not(None),
+                N.data_emissao < limite_prazo,
+            ),
             contatos=self.count(P),
             novos_contatos=self.count(P, P.criado_em >= mes, P.criado_em < fim),
             imagens_sem_chave=self.count(
@@ -64,6 +99,11 @@ class AdminReportingRepository:
             ),
         )
         return result
+
+    def _sum(self, column, *conditions):
+        return self.session.scalar(
+            select(func.coalesce(func.sum(column), 0)).where(*conditions)
+        ) or Decimal("0")
 
     def recebimentos_por_dia(self, inicio, fim):
         # timezone() mantém o agrupamento consistente com filtros e cards no PG.

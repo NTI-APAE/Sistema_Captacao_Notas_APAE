@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.infrastructure.config import get_settings
 from app.models.nota_fiscal_model import NotaFiscalModel
 from app.models.submissao_nota_model import SubmissaoNotaModel
 from app.schemas.admin_reporting_filters import TIMEZONE, AdminReportingFilter
@@ -53,7 +54,10 @@ class AdminReportingService:
             for i in range(30)
         ]
         return {
-            "indicadores": self.repository.indicadores(hoje),
+            "indicadores": self.repository.indicadores(
+                hoje,
+                prazo_maximo_emissao_meses=get_settings().prazo_maximo_emissao_meses,
+            ),
             "series": series,
             "maximo": max(1, max(item["total"] for item in series)),
             "status_submissoes": self.repository.por_status(SubmissaoNotaModel),

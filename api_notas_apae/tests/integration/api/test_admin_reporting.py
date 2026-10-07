@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
@@ -44,6 +45,8 @@ def admin_data(session_factory):
                     id=ids["nota"],
                     chave="2" * 44,
                     status="CADASTRADA",
+                    valor=Decimal("100.00"),
+                    data_emissao=date(2026, 9, 28),
                     criado_em=now,
                     atualizado_em=now,
                 ),
@@ -117,6 +120,12 @@ def test_resumo_json_e_privacidade(admin_client):
     assert result["indicadores"]["total"] == 1
     assert result["indicadores"]["notas"] == 1
     assert result["indicadores"]["notas_leitor"] == 0
+    assert result["indicadores"]["notas_whatsapp"] == 1
+    assert result["indicadores"]["total_geral"] == 1
+    assert float(result["indicadores"]["valor_cadastradas"]) == 100
+    assert float(result["indicadores"]["retorno_estimado"]) == 1
+    assert result["indicadores"]["notas_erros"] == 0
+    assert result["indicadores"]["notas_ignoradas"] == 0
     assert result["indicadores"]["reenvios_mensagens"] == 0
     assert len(result["series"]) == 30
     assert dict(result["status_submissoes"])["DUPLICADA"] == 1

@@ -134,13 +134,20 @@ class HistoricoContato(BaseModel):
 
 class Indicadores(BaseModel):
     total: int
+    total_geral: int
     hoje: int
     mes: int
     duplicadas: int
     falhas: int
     notas: int
     notas_leitor: int
+    notas_whatsapp: int
+    notas_erros: int
+    notas_ignoradas: int
     cadastradas: int
+    valor_cadastradas: Decimal
+    retorno_estimado: Decimal
+    valor_fora_prazo: Decimal
     contatos: int
     novos_contatos: int
     imagens_sem_chave: int
