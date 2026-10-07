@@ -20,6 +20,27 @@ export interface Note {
   telefone: string | null;
   chave: string | null;
   cadastro: string | null;
+  whatsapp_instance: string | null;
+  whatsapp_timestamp: string | null;
+  whatsapp_replays: number | null;
+}
+
+export interface WhatsAppMessage {
+  submissao_id: string;
+  status: string;
+  data_recebimento: string;
+  instance: string;
+  message_id: string;
+  remote_jid: string;
+  message_type: string | null;
+  timestamp: string | null;
+  processed_at: string | null;
+  push_name: string | null;
+  mimetype: string | null;
+  caption: string | null;
+  reenvios: number;
+  last_replay_at: string | null;
+  atraso_processamento_segundos: number | null;
 }
 
 export interface NoteDetail extends Note {
@@ -29,6 +50,16 @@ export interface NoteDetail extends Note {
   data_cadastro: string | null;
   valor: string | null;
   data_emissao: string | null;
+  whatsapp_message_id: string | null;
+  whatsapp_remote_jid: string | null;
+  whatsapp_message_type: string | null;
+  whatsapp_processed_at: string | null;
+  whatsapp_push_name: string | null;
+  whatsapp_mimetype: string | null;
+  whatsapp_caption: string | null;
+  whatsapp_last_replay_at: string | null;
+  atraso_processamento_segundos: number | null;
+  historico_mensagens: WhatsAppMessage[];
 }
 
 export interface Contact {
@@ -66,10 +97,12 @@ export interface Summary {
     duplicadas: number;
     falhas: number;
     notas: number;
+    notas_leitor?: number;
     cadastradas: number;
     contatos: number;
     novos_contatos: number;
     imagens_sem_chave: number;
+    reenvios_mensagens: number;
   };
   series: { dia: string; total: number }[];
   maximo: number;

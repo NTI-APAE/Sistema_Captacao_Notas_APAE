@@ -3,8 +3,13 @@
 import { useState } from "react";
 import { CalendarDays } from "lucide-react";
 import type { Summary } from "@/lib/types";
-import { dateTime, number, statusLabel } from "@/lib/format";
+import { number, statusLabel } from "@/lib/format";
 import { EmptyState } from "./ui";
+
+function chartDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
 
 export function ReceiptsChart({ series }: { series: Summary["series"] }) {
   const [selected, select] = useState(series.length - 1);
@@ -32,7 +37,7 @@ export function ReceiptsChart({ series }: { series: Summary["series"] }) {
         <span>recebimentos no período</span>
         <output>
           {current
-            ? `${dateTime(current.dia)} · ${number(current.total)} recebimento(s)`
+            ? `${chartDate(current.dia)} · ${number(current.total)} recebimento(s)`
             : "Sem registros"}
         </output>
       </div>
@@ -77,7 +82,7 @@ export function ReceiptsChart({ series }: { series: Summary["series"] }) {
                   className={selected === i ? "bar selected" : "bar"}
                   tabIndex={0}
                   role="button"
-                  aria-label={`${dateTime(item.dia)}: ${item.total} recebimentos`}
+                  aria-label={`${chartDate(item.dia)}: ${item.total} recebimentos`}
                   aria-pressed={selected === i}
                   onMouseEnter={() => select(i)}
                   onFocus={() => select(i)}
@@ -89,9 +94,7 @@ export function ReceiptsChart({ series }: { series: Summary["series"] }) {
                     }
                   }}
                 >
-                  <title>
-                    {dateTime(item.dia)}: {item.total}
-                  </title>
+                  <title>{`${chartDate(item.dia)}: ${item.total}`}</title>
                 </rect>
                 {(i % 6 === 0 || i === series.length - 1) && (
                   <text
@@ -121,7 +124,7 @@ export function ReceiptsChart({ series }: { series: Summary["series"] }) {
             <tbody>
               {series.map((item) => (
                 <tr key={item.dia}>
-                  <td>{dateTime(item.dia)}</td>
+                  <td>{chartDate(item.dia)}</td>
                   <td>{number(item.total)}</td>
                 </tr>
               ))}

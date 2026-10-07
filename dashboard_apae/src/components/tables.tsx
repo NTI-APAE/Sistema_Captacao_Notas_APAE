@@ -28,6 +28,7 @@ export function NotesTable({ items }: { items: Note[] }) {
             <th>Submissão</th>
             <th>Cadastro fiscal</th>
             <th>Origem</th>
+            <th>Instância</th>
             <th>
               <span className="sr-only">Ações</span>
             </th>
@@ -63,6 +64,7 @@ export function NotesTable({ items }: { items: Note[] }) {
                   {statusLabel(item.origem)}
                 </span>
               </td>
+              <td>{item.whatsapp_instance || "—"}</td>
               <td>
                 <Link
                   className="row-action"

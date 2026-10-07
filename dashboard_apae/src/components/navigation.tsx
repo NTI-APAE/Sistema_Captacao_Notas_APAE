@@ -8,6 +8,7 @@ import {
   HeartHandshake,
   LayoutDashboard,
   Menu,
+  FileBarChart,
   ReceiptText,
   ShieldCheck,
   UsersRound,
@@ -18,6 +19,7 @@ import { LogoutButton } from "./logout-button";
 const links = [
   { href: "/dashboard", label: "Visão geral", icon: LayoutDashboard },
   { href: "/dashboard/notas", label: "Notas fiscais", icon: ReceiptText },
+  { href: "/dashboard/relatorios", label: "Relatórios", icon: FileBarChart },
   { href: "/dashboard/contatos", label: "Contatos", icon: UsersRound },
 ];
 

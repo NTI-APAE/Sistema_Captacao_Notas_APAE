@@ -2,7 +2,8 @@ import {
   CalendarDays,
   CheckCheck,
   Copy,
-  ScanLine,
+  FileText,
+  RefreshCw,
   ReceiptText,
   UsersRound,
   UserRoundPlus,
@@ -65,6 +66,13 @@ export default async function DashboardPage() {
       tone: "green",
     },
     {
+      label: "Notas via arquivos",
+      value: totals.notas_leitor ?? 0,
+      hint: "Importadas pelo leitor",
+      icon: FileText,
+      tone: "blue",
+    },
+    {
       label: "Duplicadas",
       value: totals.duplicadas,
       hint: "Submissões repetidas · histórico",
@@ -72,11 +80,11 @@ export default async function DashboardPage() {
       tone: "amber",
     },
     {
-      label: "Falhas de leitura",
-      value: totals.falhas + totals.imagens_sem_chave,
-      hint: "Erros e imagens sem chave",
-      icon: ScanLine,
-      tone: "rose",
+      label: "Reenvios de mensagens",
+      value: totals.reenvios_mensagens,
+      hint: "Mesmo evento reapresentado",
+      icon: RefreshCw,
+      tone: "amber",
     },
   ];
   return (

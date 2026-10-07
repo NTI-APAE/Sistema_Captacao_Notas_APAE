@@ -402,6 +402,9 @@ h1 {
   gap: 13px;
   margin-bottom: 23px;
 }
+.report-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 .metric-card {
   border: 1px solid var(--line);
   background: var(--surface);
@@ -483,6 +486,14 @@ h2 {
   color: #89968c;
   margin: 7px 0 0;
   line-height: 1.5;
+}
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.report-panel .panel-header {
+  align-items: flex-start;
 }
 .text-link {
   display: flex;
@@ -1224,6 +1235,9 @@ body:has(.login-page) .workspace {
   .metric-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .overview-charts {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1381,6 +1395,9 @@ body:has(.login-page) .workspace {
   .metric-card > p {
     font-size: 8px;
   }
+  .report-metrics {
+    grid-template-columns: 1fr;
+  }
   .overview-charts {
     gap: 0;
   }
@@ -1396,6 +1413,12 @@ body:has(.login-page) .workspace {
   }
   .filters-panel {
     padding: 18px;
+  }
+  .report-actions {
+    width: 100%;
+  }
+  .report-actions .button {
+    flex: 1;
   }
   .filters-grid {
     grid-template-columns: 1fr;
@@ -1422,5 +1445,49 @@ body:has(.login-page) .workspace {
   }
   .period-chip {
     font-size: 8px;
+  }
+}
+@media print {
+  :root {
+    background: white;
+  }
+  .sidebar,
+  .mobile-bar,
+  .topbar,
+  .app-footer,
+  .filters-panel,
+  .page-heading > button,
+  .report-actions,
+  .pagination,
+  .notice,
+  .row-action {
+    display: none !important;
+  }
+  .workspace {
+    margin-left: 0;
+  }
+  main {
+    max-width: none;
+    padding: 0;
+  }
+  .page-heading {
+    margin-bottom: 18px;
+  }
+  .report-metrics {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .metric-card,
+  .report-panel {
+    break-inside: avoid;
+  }
+  .report-panel {
+    border: 0;
+  }
+  .report-panel .panel-header {
+    padding-inline: 0;
+  }
+  table {
+    font-size: 9px;
   }
 }

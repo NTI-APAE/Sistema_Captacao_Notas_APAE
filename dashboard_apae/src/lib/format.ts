@@ -3,12 +3,14 @@ export const number = (value: number) =>
 
 export function dateTime(value: string | null): string {
   if (!value) return "Não informado";
-  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
+
   return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: dateOnly ? "UTC" : "America/Sao_Paulo",
+    timeZone: "America/Sao_Paulo",
     dateStyle: "short",
-    ...(dateOnly ? {} : { timeStyle: "short" as const }),
-  }).format(new Date(dateOnly ? `${value}T00:00:00Z` : value));
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 export function money(value: string | null): string {
@@ -37,6 +39,8 @@ export function statusLabel(value: string): string {
     WHATSAPP: "WhatsApp",
     MANUAL: "Manual",
     ARQUIVO_TXT: "Arquivo TXT",
+    LEITOR_NOTA_FISCAL: "Leitor de Nota Fiscal",
+    IMPORTADO: "Importado pelo leitor",
     COMUNICACAO_WHATSAPP: "Comunicação pelo WhatsApp",
     LIGACAO: "Ligações",
     CAMPANHAS: "Campanhas",

@@ -91,7 +91,8 @@ sem o middleware de autenticação.
 - `/login`: autenticação administrativa;
 - `/dashboard`: indicadores, volume dos últimos 30 dias e últimos recebimentos;
 - `/dashboard/notas`: filtros e paginação de submissões;
-- `/dashboard/notas/{submissao_id}`: detalhe do recebimento e da nota vinculada;
+- `/dashboard/relatorios`: filtros, indicadores, impressão e exportação CSV das notas recebidas;
+- `/dashboard/notas/{submissao_id}`: detalhe do recebimento, metadados da mensagem WhatsApp e histórico de reenvios/duplicidades;
 - `/dashboard/contatos`: filtros, consentimentos atuais e contagens;
 - `/dashboard/contatos/{pessoa_id}`: dados, histórico e notas enviadas.
 

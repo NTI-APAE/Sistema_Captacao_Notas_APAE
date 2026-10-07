@@ -77,6 +77,90 @@ export default async function NotePage({
           ]}
         />
       </Panel>
+      {item.whatsapp_message_id && (
+        <Panel
+          title="Mensagem WhatsApp"
+          subtitle="Metadados recebidos da Evolution e tempo de processamento."
+        >
+          <DetailGrid
+            items={[
+              [
+                "ID da mensagem",
+                <span className="mono" key="message-id">
+                  {item.whatsapp_message_id}
+                </span>,
+              ],
+              ["Instância", item.whatsapp_instance],
+              [
+                "JID de origem",
+                <span className="mono" key="remote-jid">
+                  {item.whatsapp_remote_jid}
+                </span>,
+              ],
+              ["Data/hora no WhatsApp", dateTime(item.whatsapp_timestamp)],
+              ["Processada em", dateTime(item.whatsapp_processed_at)],
+              [
+                "Atraso até o processamento",
+                item.atraso_processamento_segundos === null
+                  ? "Não informado"
+                  : `${item.atraso_processamento_segundos}s`,
+              ],
+              ["Nome exibido", item.whatsapp_push_name],
+              ["Tipo da mensagem", item.whatsapp_message_type],
+              ["MIME da imagem", item.whatsapp_mimetype],
+              ["Legenda", item.whatsapp_caption],
+              ["Reenvios do mesmo evento", String(item.whatsapp_replays ?? 0)],
+              ["Último reenvio", dateTime(item.whatsapp_last_replay_at)],
+            ]}
+          />
+        </Panel>
+      )}
+      {item.historico_mensagens.length > 0 && (
+        <Panel
+          title="Histórico de mensagens da nota"
+          subtitle="Mensagens diferentes com a mesma chave permanecem distintas dos reenvios do mesmo evento."
+        >
+          <div
+            className="table-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label="Histórico de mensagens da nota"
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th>Mensagem</th>
+                  <th>Instância</th>
+                  <th>Recebida</th>
+                  <th>Status</th>
+                  <th>Reenvios</th>
+                  <th>Atraso</th>
+                </tr>
+              </thead>
+              <tbody>
+                {item.historico_mensagens.map((message) => (
+                  <tr key={message.submissao_id}>
+                    <td className="mono">{message.message_id}</td>
+                    <td>{message.instance}</td>
+                    <td className="nowrap">
+                      {dateTime(message.timestamp || message.data_recebimento)}
+                    </td>
+                    <td>
+                      <StatusBadge value={message.status} />
+                    </td>
+                    <td>{message.reenvios}</td>
+                    <td>
+                      {message.atraso_processamento_segundos === null
+                        ? "Não informado"
+                        : `${message.atraso_processamento_segundos}s`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
       <Panel
         title="Nota fiscal vinculada"
         action={<StatusBadge value={item.cadastro} />}

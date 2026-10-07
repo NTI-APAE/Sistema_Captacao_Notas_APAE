@@ -38,29 +38,23 @@ export function Filters({
   kind,
   query,
   options,
+  path = `/dashboard/${kind}`,
 }: {
   kind: "notas" | "contatos";
   query: Query;
   options?: Options;
+  path?: string;
 }) {
   const notes = kind === "notas";
   // Reinicializa os campos quando uma navegação GET muda a consulta.
   return (
-    <Form
-      action={`/${kind}`}
-      key={JSON.stringify(query)}
-      className="filters-panel"
-    >
+    <Form action={path} key={JSON.stringify(query)} className="filters-panel">
       <div className="filters-top">
         <div className="filters-label">
           <SlidersHorizontal size={16} />
           <h2>Filtrar {notes ? "recebimentos" : "contatos"}</h2>
         </div>
-        <Link
-          href={`/dashboard/${kind}`}
-          className="clear-filters"
-          prefetch={false}
-        >
+        <Link href={path} className="clear-filters" prefetch={false}>
           Limpar filtros
         </Link>
       </div>
