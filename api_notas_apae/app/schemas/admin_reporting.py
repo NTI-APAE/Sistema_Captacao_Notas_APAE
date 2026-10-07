@@ -154,6 +154,24 @@ class Indicadores(BaseModel):
     reenvios_mensagens: int
 
 
+class ResumoLeitorAdmin(AdminReportingDTO):
+    operacoes: int
+    total_notas: int
+    tentadas: int
+    cadastradas: int
+    duplicadas: int
+    ignoradas: int
+    erros: int
+    valor_total: Decimal
+    valor_cadastradas: Decimal
+    valor_duplicadas: Decimal
+    valor_ignoradas: Decimal
+    valor_erros: Decimal
+    tempo_total_segundos: Decimal
+    tempo_notas_segundos: Decimal
+    ultima_operacao_em: datetime | None
+
+
 class DiaRecebimento(BaseModel):
     dia: date
     total: int
@@ -165,4 +183,5 @@ class ResumoAdmin(BaseModel):
     maximo: int
     status_submissoes: list[tuple[str, int]]
     status_notas: list[tuple[str, int]]
+    leitor: ResumoLeitorAdmin
     result: Pagina[NotaLista]

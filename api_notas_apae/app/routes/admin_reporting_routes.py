@@ -21,6 +21,7 @@ from app.schemas.admin_reporting import (
     NotaLista,
     Pagina,
     ResumoAdmin,
+    ResumoLeitorAdmin,
 )
 from app.schemas.admin_reporting_filters import AdminReportingFilter
 from app.services.admin_reporting_service import AdminReportingService
@@ -90,6 +91,11 @@ def resumo(service: Service):
 @router.get("/opcoes")
 def opcoes():
     return {"status": list(SubmissaoStatus), "cadastros": list(NotaStatus)}
+
+
+@router.get("/leitor", response_model=ResumoLeitorAdmin)
+def leitor(service: Service, filtro: Filtro):
+    return service.leitor(filtro)
 
 
 @router.get("/notas", response_model=Pagina[NotaLista])

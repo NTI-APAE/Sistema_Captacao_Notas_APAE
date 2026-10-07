@@ -9,6 +9,7 @@ from app.repositories.unit_of_work import (
 )
 from app.services.execucoes import RegistrarResultadoCadastroService
 from app.services.notas import ConsultarNotaService, ListarNotasService
+from app.services.resumos_leitor import RegistrarResumoOperacaoLeitorService
 from app.services.worker import (
     ConsultarExecucaoWorkerService,
     ObterProximaNotaParaProcessamentoService,
@@ -36,6 +37,12 @@ def get_registrar_resultado_cadastro_service(
     unit_of_work: Annotated[Transaction, Depends(get_unit_of_work)],
 ) -> RegistrarResultadoCadastroService:
     return RegistrarResultadoCadastroService(unit_of_work=unit_of_work)
+
+
+def get_registrar_resumo_operacao_leitor_service(
+    unit_of_work: Annotated[Transaction, Depends(get_unit_of_work)],
+) -> RegistrarResumoOperacaoLeitorService:
+    return RegistrarResumoOperacaoLeitorService(unit_of_work=unit_of_work)
 
 
 def get_obter_proxima_nota_worker_service(

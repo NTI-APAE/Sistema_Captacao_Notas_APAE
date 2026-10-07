@@ -14,6 +14,7 @@ from app.models.consentimento_model import ConsentimentoModel as C
 from app.models.evento_imagem import EventoImagem as E
 from app.models.nota_fiscal_model import NotaFiscalModel as N
 from app.models.pessoa_model import PessoaModel as P
+from app.models.resumo_operacao_leitor_model import ResumoOperacaoLeitorModel as R
 from app.models.submissao_nota_model import SubmissaoNotaModel as S
 from app.models.usuario_admin_model import UsuarioAdminModel as U
 
@@ -134,6 +135,42 @@ def test_resumo_json_e_privacidade(admin_client):
     assert "private-fingerprint" not in response.text
     assert response.headers["cache-control"] == "private, no-store"
     assert result["result"]["items"][0]["data_recebimento"].endswith("Z")
+
+
+def test_resumo_do_leitor_no_dashboard(admin_client, session_factory):
+    with session_factory() as session:
+        session.add(
+            R(
+                id=uuid4(),
+                operacao_id=uuid4(),
+                total_notas=4,
+                tentadas=5,
+                cadastradas=1,
+                duplicadas=1,
+                ignoradas=1,
+                erros=1,
+                valor_total=Decimal("100.00"),
+                valor_cadastradas=Decimal("40.00"),
+                valor_duplicadas=Decimal("20.00"),
+                valor_ignoradas=Decimal("30.00"),
+                valor_erros=Decimal("10.00"),
+                tempo_total_segundos=Decimal("12.50"),
+                tempo_notas_segundos=Decimal("10.00"),
+            )
+        )
+        session.commit()
+
+    result = admin_client.get("/admin/relatorios/resumo")
+    assert result.status_code == 200
+    leitor = result.json()["leitor"]
+    assert leitor["operacoes"] == 1
+    assert leitor["total_notas"] == 4
+    assert float(leitor["valor_total"]) == 100
+    assert float(leitor["valor_ignoradas"]) == 30
+
+    detalhe = admin_client.get("/admin/relatorios/leitor")
+    assert detalhe.status_code == 200
+    assert detalhe.json()["valor_erros"] == "10.00"
 
 
 def test_lista_json_filtrada_e_paginada(admin_client):

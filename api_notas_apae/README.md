@@ -69,6 +69,7 @@ submeteu a mesma nota várias vezes, a nota aparece uma única vez.
 
 - `GET /health`
 - `POST /integracao/notas/importar-txt` (interno, autenticado)
+- `POST /integracao/leitor/resumos` (interno, autenticado)
 - `POST /notas/processar-imagem` (interno, autenticado, multipart)
 - `GET /notas` (worker, autenticado)
 - `GET /notas/{id}` (worker, autenticado)
@@ -95,6 +96,14 @@ O leitor desktop usa `POST /integracao/notas/importar-txt` com o header
 chaves extraídas do TXT; a API cria ou reativa as notas diretamente no banco
 central. Depois, o leitor reserva cada nota pelos endpoints `/worker/*` e envia
 o resultado do cadastro para a mesma execução.
+
+Ao concluir uma operação, o leitor envia para `POST /integracao/leitor/resumos`
+os totais e os valores separados por cadastradas, duplicadas, ignoradas e erros.
+`operacao_id` é o identificador idempotente do lote: o mesmo payload pode ser
+reenviado sem criar outro registro; dados divergentes para o mesmo identificador
+retornam `409 Conflict`. O dashboard consulta o agregado em
+`GET /admin/relatorios/resumo` (campo `leitor`) ou em
+`GET /admin/relatorios/leitor`.
 
 As consultas operacionais `GET /notas` e `GET /notas/{id}`, usadas pelo leitor
 desktop, também exigem o header `X-Worker-API-Key` configurado em

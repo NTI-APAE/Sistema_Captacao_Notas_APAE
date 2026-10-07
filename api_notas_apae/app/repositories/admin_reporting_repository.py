@@ -9,6 +9,7 @@ from app.models.consentimento_model import ConsentimentoModel as C
 from app.models.evento_imagem import EventoImagem as E
 from app.models.nota_fiscal_model import NotaFiscalModel as N
 from app.models.pessoa_model import PessoaModel as P
+from app.models.resumo_operacao_leitor_model import ResumoOperacaoLeitorModel as R
 from app.models.submissao_nota_model import SubmissaoNotaModel as S
 from app.schemas.admin_reporting_filters import inicio_dia
 
@@ -99,6 +100,42 @@ class AdminReportingRepository:
             ),
         )
         return result
+
+    def resumo_leitor(self, filtro=None):
+        conditions = []
+        if filtro is not None:
+            if filtro.inicio:
+                conditions.append(R.criado_em >= filtro.inicio)
+            if filtro.fim:
+                conditions.append(R.criado_em < filtro.fim)
+        totals = self.session.execute(
+            select(
+                func.count(R.id).label("operacoes"),
+                func.coalesce(func.sum(R.total_notas), 0).label("total_notas"),
+                func.coalesce(func.sum(R.tentadas), 0).label("tentadas"),
+                func.coalesce(func.sum(R.cadastradas), 0).label("cadastradas"),
+                func.coalesce(func.sum(R.duplicadas), 0).label("duplicadas"),
+                func.coalesce(func.sum(R.ignoradas), 0).label("ignoradas"),
+                func.coalesce(func.sum(R.erros), 0).label("erros"),
+                func.coalesce(func.sum(R.valor_total), 0).label("valor_total"),
+                func.coalesce(func.sum(R.valor_cadastradas), 0).label(
+                    "valor_cadastradas"
+                ),
+                func.coalesce(func.sum(R.valor_duplicadas), 0).label(
+                    "valor_duplicadas"
+                ),
+                func.coalesce(func.sum(R.valor_ignoradas), 0).label("valor_ignoradas"),
+                func.coalesce(func.sum(R.valor_erros), 0).label("valor_erros"),
+                func.coalesce(func.sum(R.tempo_total_segundos), 0).label(
+                    "tempo_total_segundos"
+                ),
+                func.coalesce(func.sum(R.tempo_notas_segundos), 0).label(
+                    "tempo_notas_segundos"
+                ),
+                func.max(R.criado_em).label("ultima_operacao_em"),
+            ).where(*conditions)
+        ).mappings().one()
+        return dict(totals)
 
     def _sum(self, column, *conditions):
         return self.session.scalar(

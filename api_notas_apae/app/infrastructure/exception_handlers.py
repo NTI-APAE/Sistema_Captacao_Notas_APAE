@@ -14,6 +14,9 @@ from app.domain.exceptions.pessoa_nao_encontrada_exception import (
 from app.domain.exceptions.resultado_execucao_conflitante_exception import (
     ResultadoExecucaoConflitanteException,
 )
+from app.domain.exceptions.resumo_operacao_leitor_conflitante_exception import (
+    ResumoOperacaoLeitorConflitanteException,
+)
 from app.domain.exceptions.transicao_status_invalida_exception import (
     TransicaoStatusInvalidaException,
 )
@@ -78,4 +81,17 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": str(exc), "code": "RESULTADO_EXECUCAO_CONFLITANTE"},
+        )
+
+    @app.exception_handler(ResumoOperacaoLeitorConflitanteException)
+    async def resumo_operacao_leitor_conflitante_handler(
+        request: Request,
+        exc: ResumoOperacaoLeitorConflitanteException,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "detail": str(exc),
+                "code": "RESUMO_OPERACAO_LEITOR_CONFLITANTE",
+            },
         )

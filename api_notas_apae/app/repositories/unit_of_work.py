@@ -9,6 +9,7 @@ from app.repositories.exceptions import DuplicateKeyError
 from .execucao_repository import SQLAlchemyExecucaoCadastroRepository
 from .nota_repository import SQLAlchemyNotaRepository
 from .pessoa_repository import SQLAlchemyPessoaRepository
+from .resumo_operacao_leitor_repository import SQLAlchemyResumoOperacaoLeitorRepository
 from .submissao_repository import SQLAlchemySubmissaoRepository
 
 
@@ -25,6 +26,7 @@ class SQLAlchemyUnitOfWork:
         self.notas = SQLAlchemyNotaRepository(self.session)
         self.submissoes = SQLAlchemySubmissaoRepository(self.session)
         self.execucoes = SQLAlchemyExecucaoCadastroRepository(self.session)
+        self.resumos_leitor = SQLAlchemyResumoOperacaoLeitorRepository(self.session)
         return self
 
     def __exit__(

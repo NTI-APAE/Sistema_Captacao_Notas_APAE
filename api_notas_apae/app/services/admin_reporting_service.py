@@ -62,8 +62,12 @@ class AdminReportingService:
             "maximo": max(1, max(item["total"] for item in series)),
             "status_submissoes": self.repository.por_status(SubmissaoNotaModel),
             "status_notas": self.repository.por_status(NotaFiscalModel),
+            "leitor": self.repository.resumo_leitor(),
             "result": self.notas(AdminReportingFilter(size=8)),
         }
+
+    def leitor(self, filtro):
+        return self.repository.resumo_leitor(filtro)
 
     def notas(self, filtro, pessoa_id=None):
         return self._decorate_page(self.repository.notas(filtro, pessoa_id))

@@ -5,6 +5,7 @@ from uuid import UUID
 from app.domain.entities.execucao_cadastro import ExecucaoCadastro
 from app.domain.entities.nota_fiscal import NotaFiscal
 from app.domain.entities.pessoa import Pessoa
+from app.domain.entities.resumo_operacao_leitor import ResumoOperacaoLeitor
 from app.domain.entities.submissao_nota import SubmissaoNota
 from app.schemas.pagination import ListarNotasFiltro, PaginatedOutput
 
@@ -83,11 +84,20 @@ class ExecucaoCadastroRepositoryContract(Protocol):
         raise NotImplementedError
 
 
+class ResumoOperacaoLeitorRepositoryContract(Protocol):
+    def buscar_por_operacao_id(self, operacao_id: UUID) -> ResumoOperacaoLeitor | None:
+        raise NotImplementedError
+
+    def adicionar(self, resumo: ResumoOperacaoLeitor) -> None:
+        raise NotImplementedError
+
+
 class Transaction(Protocol):
     pessoas: PessoaRepositoryContract
     notas: NotaRepositoryContract
     submissoes: SubmissaoRepositoryContract
     execucoes: ExecucaoCadastroRepositoryContract
+    resumos_leitor: ResumoOperacaoLeitorRepositoryContract
 
     def __enter__(self) -> "Transaction":
         raise NotImplementedError
