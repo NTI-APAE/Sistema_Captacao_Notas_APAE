@@ -1,5 +1,10 @@
-export const number = (value: number) =>
-  new Intl.NumberFormat("pt-BR").format(value);
+function finite(value: string | number | null | undefined): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export const number = (value: string | number | null | undefined) =>
+  new Intl.NumberFormat("pt-BR").format(finite(value));
 
 export function dateTime(value: string | null): string {
   if (!value) return "Não informado";
@@ -13,13 +18,13 @@ export function dateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
-export function money(value: string | null): string {
+export function money(value: string | number | null | undefined): string {
   return value === null
     ? "Não informado"
     : new Intl.NumberFormat("pt-BR", {
         style: "currency",
         currency: "BRL",
-      }).format(Number(value));
+      }).format(finite(value));
 }
 
 export function statusLabel(value: string): string {

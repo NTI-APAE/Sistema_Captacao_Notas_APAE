@@ -98,7 +98,14 @@ export interface Summary {
     falhas: number;
     notas: number;
     notas_leitor?: number;
+    notas_whatsapp: number;
+    notas_erros: number;
+    notas_ignoradas: number;
+    total_geral: number;
     cadastradas: number;
+    valor_cadastradas: string;
+    retorno_estimado: string;
+    valor_fora_prazo: string;
     contatos: number;
     novos_contatos: number;
     imagens_sem_chave: number;

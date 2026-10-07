@@ -2,9 +2,11 @@ import {
   CalendarDays,
   CheckCheck,
   Copy,
+  Ban,
   FileText,
   RefreshCw,
   ReceiptText,
+  TriangleAlert,
   UsersRound,
   UserRoundPlus,
 } from "lucide-react";
@@ -84,6 +86,20 @@ export default async function DashboardPage() {
       value: totals.reenvios_mensagens,
       hint: "Mesmo evento reapresentado",
       icon: RefreshCw,
+      tone: "amber",
+    },
+    {
+      label: "Notas com erro",
+      value: totals.falhas + totals.notas_erros,
+      hint: "Falha de leitura ou cadastro",
+      icon: TriangleAlert,
+      tone: "rose",
+    },
+    {
+      label: "Notas ignoradas",
+      value: totals.notas_ignoradas,
+      hint: "Ignoradas no cadastro",
+      icon: Ban,
       tone: "amber",
     },
   ];
