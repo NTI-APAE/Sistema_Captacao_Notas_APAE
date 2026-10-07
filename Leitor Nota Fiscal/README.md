@@ -50,6 +50,11 @@ python main.py
 
 O banco é administrado somente pela API; o leitor grava apenas logs locais em `logs/sistema.log`.
 
+Ao concluir cada operação de automação, o leitor envia à API um resumo idempotente
+com o identificador do lote, quantidades e valores totais separados por
+`CADASTRADA`, `DUPLICADA`, `IGNORADA` e `ERRO`. A API persiste esses dados para o
+dashboard administrativo; o envio usa `NOTAS_API_INTERNAL_KEY`.
+
 ## Gerar ZIP para outra maquina
 
 Para gerar um pacote completo com executavel, Chromium do Playwright e `venv` com dependencias, execute:
@@ -262,9 +267,11 @@ Na aba **Relatorios**:
 2. Clique em **Atualizar**.
 3. Confira o resumo por dia.
 4. Confira no resumo principal os campos **Fora Prazo**, **Valor Fora Prazo** e **Valor Erros**.
-5. Na lista de teste manual, copie as notas com status `IGNORADA` ou `ERRO`.
-6. Clique em **Exportar Excel** ou **Exportar relatorio**.
-7. Use **Limpar relatorio** para apagar o historico dos relatorios sem remover a fila pendente.
+5. No dashboard administrativo, consulte os valores totais e separados por status
+   no bloco de operações do leitor.
+6. Na lista de teste manual, copie as notas com status `IGNORADA` ou `ERRO`.
+7. Clique em **Exportar Excel** ou **Exportar relatorio**.
+8. Use **Limpar relatorio** para apagar o historico dos relatorios sem remover a fila pendente.
 
 O botao **Limpar relatorio** remove notas `CADASTRADA`, `DUPLICADA`, `IGNORADA` e `ERRO` que ja atingiram o limite de tentativas. Notas ainda pendentes ou aptas para nova tentativa sao preservadas.
 

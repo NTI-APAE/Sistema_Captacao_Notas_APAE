@@ -56,7 +56,9 @@ class ApiNotasClient:
 
     def _internal_headers(self) -> dict[str, str]:
         if not config.NOTAS_API_INTERNAL_KEY:
-            raise ApiNotasError("Configure NOTAS_API_INTERNAL_KEY para importar TXT.")
+            raise ApiNotasError(
+                "Configure NOTAS_API_INTERNAL_KEY para as integrações internas."
+            )
         return {"X-Internal-API-Key": config.NOTAS_API_INTERNAL_KEY}
 
     def _worker_headers(self) -> dict[str, str]:
@@ -94,6 +96,14 @@ class ApiNotasClient:
             total_inseridas=data["total_inseridas"],
             total_reativadas=data["total_reativadas"],
             total_ja_existentes=data["total_ja_existentes"],
+        )
+
+    def registrar_resumo_leitor(self, resumo: dict[str, Any]) -> None:
+        self._request(
+            "POST",
+            "/integracao/leitor/resumos",
+            payload=resumo,
+            headers=self._internal_headers(),
         )
 
     def obter_proxima_nota(self) -> Nota | None:

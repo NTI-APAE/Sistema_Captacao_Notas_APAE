@@ -6,8 +6,10 @@ import threading
 import time
 import unicodedata
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Callable, Optional
+from uuid import uuid4
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, sync_playwright
 
@@ -79,6 +81,9 @@ class AutomacaoNotaLegal:
         self._notas_erros_sessao = 0
         self._tempo_total_notas_segundos = 0.0
         self._nota_em_processamento: Nota | None = None
+        self._operacao_id = str(uuid4())
+        self._valor_nota_em_processamento: float | None = None
+        self._resultados_finais_sessao: dict[str, tuple[str, float | None]] = {}
 
     @property
     def rodando(self) -> bool:
@@ -188,12 +193,14 @@ class AutomacaoNotaLegal:
                         self._pause_event.clear()
                         continue
 
+                    if self._conclusao_notificada:
+                        self._reiniciar_resumo_operacao()
                     self._conclusao_notificada = False
                     if self._inicio_processamento_em is None:
                         self._inicio_processamento_em = time.perf_counter()
                     self._estado("EXECUTANDO")
                     status_final, duracao_segundos = self._processar_nota(page, nota)
-                    self._registrar_resultado_sessao(status_final, duracao_segundos)
+                    self._registrar_resultado_sessao(status_final, duracao_segundos, nota)
                     self._notas_processadas_lote += 1
                     self._aplicar_pausa_entre_notas()
 
@@ -487,6 +494,7 @@ class AutomacaoNotaLegal:
         inicio_tentativa = time.perf_counter()
         data_emissao_nota: date | None = None
         self._nota_em_processamento = nota
+        self._valor_nota_em_processamento = None
         self._log(f"Processando nota {nota.chave}.")
         try:
             self._voltar_se_estiver_em_resultado(page)
@@ -540,6 +548,7 @@ class AutomacaoNotaLegal:
                 page.wait_for_timeout(espera_validacao)
 
             valor_nota = self._ler_valor_nota(page)
+            self._valor_nota_em_processamento = valor_nota
             if valor_nota is not None:
                 self._log(f"Valor da nota capturado: {self._formatar_valor(valor_nota)}")
 
@@ -618,7 +627,7 @@ class AutomacaoNotaLegal:
                 mensagem or "Processada pela automacao",
                 incrementar_tentativa=True,
                 definir_data_cadastro=status == STATUS_CADASTRADA,
-                valor=valor_nota,
+                valor=self._valor_nota_em_processamento,
                 data_emissao_nota=data_emissao_nota.isoformat() if data_emissao_nota else None,
                 tempo_cadastro_segundos=duracao_segundos,
                 db_path=self.db_path,
@@ -647,6 +656,7 @@ class AutomacaoNotaLegal:
                 STATUS_ERRO,
                 mensagem_erro,
                 incrementar_tentativa=True,
+                valor=self._valor_nota_em_processamento,
                 data_emissao_nota=data_emissao_nota.isoformat() if data_emissao_nota else None,
                 tempo_cadastro_segundos=duracao_segundos,
                 db_path=self.db_path,
@@ -663,7 +673,23 @@ class AutomacaoNotaLegal:
     def _duracao_tentativa(self, inicio_tentativa: float) -> float:
         return round(max(0.0, time.perf_counter() - inicio_tentativa), 2)
 
-    def _registrar_resultado_sessao(self, status: str | None, duracao_segundos: float) -> None:
+    def _reiniciar_resumo_operacao(self) -> None:
+        self._operacao_id = str(uuid4())
+        self._notas_tentadas_sessao = 0
+        self._notas_cadastradas_sessao = 0
+        self._notas_duplicadas_sessao = 0
+        self._notas_ignoradas_sessao = 0
+        self._notas_erros_sessao = 0
+        self._tempo_total_notas_segundos = 0.0
+        self._inicio_processamento_em = None
+        self._resultados_finais_sessao.clear()
+
+    def _registrar_resultado_sessao(
+        self,
+        status: str | None,
+        duracao_segundos: float,
+        nota: Nota,
+    ) -> None:
         if not status:
             return
         self._notas_tentadas_sessao += 1
@@ -676,6 +702,11 @@ class AutomacaoNotaLegal:
             self._notas_ignoradas_sessao += 1
         elif status == STATUS_ERRO:
             self._notas_erros_sessao += 1
+        if status in {STATUS_CADASTRADA, STATUS_DUPLICADA, STATUS_IGNORADA, STATUS_ERRO}:
+            self._resultados_finais_sessao[str(nota.id)] = (
+                status,
+                self._valor_nota_em_processamento,
+            )
 
     def _notificar_conclusao(self) -> None:
         if self._conclusao_notificada:
@@ -685,6 +716,8 @@ class AutomacaoNotaLegal:
         if self._inicio_processamento_em is not None:
             tempo_total = max(0.0, time.perf_counter() - self._inicio_processamento_em)
         resumo = {
+            "operacao_id": self._operacao_id,
+            "total_notas": len(self._resultados_finais_sessao),
             "tentadas": self._notas_tentadas_sessao,
             "cadastradas": self._notas_cadastradas_sessao,
             "duplicadas": self._notas_duplicadas_sessao,
@@ -693,12 +726,35 @@ class AutomacaoNotaLegal:
             "tempo_total_segundos": round(tempo_total, 2),
             "tempo_notas_segundos": round(self._tempo_total_notas_segundos, 2),
         }
+        valores = {
+            STATUS_CADASTRADA: Decimal("0"),
+            STATUS_DUPLICADA: Decimal("0"),
+            STATUS_IGNORADA: Decimal("0"),
+            STATUS_ERRO: Decimal("0"),
+        }
+        for status, valor in self._resultados_finais_sessao.values():
+            if valor is not None:
+                valores[status] += Decimal(str(valor))
+        resumo.update(
+            {
+                "valor_total": str(sum(valores.values(), Decimal("0"))),
+                "valor_cadastradas": str(valores[STATUS_CADASTRADA]),
+                "valor_duplicadas": str(valores[STATUS_DUPLICADA]),
+                "valor_ignoradas": str(valores[STATUS_IGNORADA]),
+                "valor_erros": str(valores[STATUS_ERRO]),
+            }
+        )
         self._log(
             "Resumo da automacao: "
             f"{resumo['tentadas']} tentativa(s), "
             f"{resumo['cadastradas']} cadastrada(s), "
             f"tempo total {self._formatar_duracao(float(resumo['tempo_total_segundos']))}."
         )
+        try:
+            self.api_client.registrar_resumo_leitor(resumo)
+            self._log("Resumo da operacao enviado para a API de notas.")
+        except Exception as exc:
+            self._log(f"Nao foi possivel enviar o resumo para a API: {exc}", error=True)
         if self.conclusao_callback:
             self.conclusao_callback(resumo)
 
