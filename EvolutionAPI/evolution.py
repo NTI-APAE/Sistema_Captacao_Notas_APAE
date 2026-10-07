@@ -1,5 +1,6 @@
 import base64
 import binascii
+import logging
 import os
 
 import httpx
@@ -7,16 +8,19 @@ from fastapi import HTTPException
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
-EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "http://localhost:8080").rstrip("/")
+EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "http://localhost:8080").rstrip(
+    "/"
+)
 EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "teste2")
 EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY")
+logger = logging.getLogger(__name__)
 
 
 async def recuperar_imagem(id_mensagem: str) -> tuple[bytes, str]:
     if not EVOLUTION_API_KEY:
         raise HTTPException(
             status_code=500,
-            detail="EVOLUTION_API_KEY não configurada",
+            detail="EVOLUTION_API_KEY nao configurada",
         )
 
     url = f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/{EVOLUTION_INSTANCE}"
@@ -30,8 +34,6 @@ async def recuperar_imagem(id_mensagem: str) -> tuple[bytes, str]:
         "convertToMp4": False,
     }
 
-    print("\n=== RECUPERAÇÃO DA IMAGEM ===", flush=True)
-
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resposta = await client.post(
@@ -44,10 +46,9 @@ async def recuperar_imagem(id_mensagem: str) -> tuple[bytes, str]:
             resultado = resposta.json()
 
     except httpx.HTTPStatusError as erro:
-        print(
-            "Evolution retornou HTTP:",
+        logger.warning(
+            "Evolution retornou HTTP durante recuperacao da imagem: %s",
             erro.response.status_code,
-            flush=True,
         )
         raise HTTPException(
             status_code=502,
@@ -55,20 +56,19 @@ async def recuperar_imagem(id_mensagem: str) -> tuple[bytes, str]:
         ) from erro
 
     except httpx.RequestError as erro:
-        print(
-            "Falha de comunicação:",
+        logger.warning(
+            "Falha de comunicacao com a Evolution: %s",
             type(erro).__name__,
-            flush=True,
         )
         raise HTTPException(
             status_code=502,
-            detail="Falha de comunicação com a Evolution",
+            detail="Falha de comunicacao com a Evolution",
         ) from erro
 
     except ValueError as erro:
         raise HTTPException(
             status_code=502,
-            detail="Evolution retornou JSON inválido",
+            detail="Evolution retornou JSON invalido",
         ) from erro
 
     if not isinstance(resultado, dict):
@@ -82,7 +82,7 @@ async def recuperar_imagem(id_mensagem: str) -> tuple[bytes, str]:
     if not isinstance(conteudo_base64, str) or not conteudo_base64:
         raise HTTPException(
             status_code=502,
-            detail="Evolution não retornou Base64",
+            detail="Evolution nao retornou Base64",
         )
 
     if conteudo_base64.startswith("data:"):
@@ -99,7 +99,7 @@ async def recuperar_imagem(id_mensagem: str) -> tuple[bytes, str]:
     except (ValueError, binascii.Error) as erro:
         raise HTTPException(
             status_code=502,
-            detail="Base64 inválido",
+            detail="Base64 invalido",
         ) from erro
 
     if not imagem_bytes:
@@ -116,8 +116,9 @@ async def recuperar_imagem(id_mensagem: str) -> tuple[bytes, str]:
 
     mimetype = resultado.get("mimetype") or "desconhecido"
 
-    print("Imagem recuperada!", flush=True)
-    print("MIME:", mimetype, flush=True)
-    print("Tamanho:", len(imagem_bytes), "bytes", flush=True)
+    logger.info(
+        "Imagem recuperada: OK",
+        extra={"event": "image_recovered", "result": "ok"},
+    )
 
     return imagem_bytes, mimetype

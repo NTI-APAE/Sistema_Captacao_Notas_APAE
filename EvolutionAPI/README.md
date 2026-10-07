@@ -35,20 +35,20 @@ Mantenha a Evolution configurada com:
 
 - URL `http://host.docker.internal:8001/webhook/whatsapp` no Docker Desktop.
 - Evento `MESSAGES_UPSERT`, sem acrescentar o evento ao caminho da URL.
-- Header `X-Webhook-Token` igual ao WEBHOOK_TOKEN do webhook.
+- Header `X-Webhook-Token` igual ao EVOLUTION_WEBHOOK_TOKEN do webhook.
 - EVOLUTION_INSTANCE correspondente ao nome da instância (atualmente teste2).
 
-O cliente interno usa NOTAS_API_URL e NOTAS_INTERNAL_API_KEY. Quando esta chave
-não está definida, usa WEBHOOK_TOKEN. A API de notas precisa receber o mesmo
-segredo. O inicializador `api_notas_apae/run_local.py` facilita isso no Windows,
-lendo somente o token do arquivo existente. Para implantação em containers,
-injete a chave interna no ambiente da API e use os nomes de serviço na rede.
+O cliente interno usa NOTAS_API_URL e NOTAS_API_INTERNAL_KEY. A API de notas
+precisa receber o mesmo segredo. O inicializador `api_notas_apae/run_local.py`
+facilita isso no Windows, lendo somente a chave interna do arquivo existente.
+Para implantação em containers, injete a chave interna no ambiente da API e use
+os nomes de serviço na rede.
 
 ## Respostas e repetição
 
-A rota interna agora é POST /notas/processar-imagem, corpo binário. O webhook
-transmite origem WHATSAPP, instância, ID da mensagem e telefone nos headers,
-sem gravar esses dados em logs. Veja o contrato em
+A rota interna agora é POST /notas/processar-imagem, usando multipart/form-data.
+O webhook transmite a imagem em bytes e os metadados da mensagem nos campos do
+formulário, sem registrar conteúdo sensível nos logs. Veja o contrato em
 [REFATORACAO.md](../api_notas_apae/REFATORACAO.md).
 
 - `saved=true`: API confirmou o registro das submissões.
