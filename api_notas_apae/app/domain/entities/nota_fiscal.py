@@ -49,14 +49,44 @@ class NotaFiscal:
         self.mensagem_status = None
         self._alterar_status(
             NotaStatus.CADASTRADA,
-            permitidos={NotaStatus.CADASTRANDO, NotaStatus.AGUARDANDO_CAPTCHA},
+            permitidos={
+                NotaStatus.CADASTRANDO,
+                NotaStatus.AGUARDANDO_CAPTCHA,
+                NotaStatus.PAUSADA,
+            },
         )
 
     def marcar_erro_cadastro(self, mensagem: str | None = None) -> None:
         self.mensagem_status = mensagem
         self._alterar_status(
             NotaStatus.ERRO_CADASTRO,
-            permitidos={NotaStatus.CADASTRANDO, NotaStatus.AGUARDANDO_CAPTCHA},
+            permitidos={
+                NotaStatus.CADASTRANDO,
+                NotaStatus.AGUARDANDO_CAPTCHA,
+                NotaStatus.PAUSADA,
+            },
+        )
+
+    def marcar_duplicada(self, mensagem: str | None = None) -> None:
+        self.mensagem_status = mensagem
+        self._alterar_status(
+            NotaStatus.DUPLICADA,
+            permitidos={
+                NotaStatus.CADASTRANDO,
+                NotaStatus.AGUARDANDO_CAPTCHA,
+                NotaStatus.PAUSADA,
+            },
+        )
+
+    def marcar_ignorada(self, mensagem: str | None = None) -> None:
+        self.mensagem_status = mensagem
+        self._alterar_status(
+            NotaStatus.IGNORADA,
+            permitidos={
+                NotaStatus.CADASTRANDO,
+                NotaStatus.AGUARDANDO_CAPTCHA,
+                NotaStatus.PAUSADA,
+            },
         )
 
     def marcar_timeout_cadastro(self, mensagem: str | None = None) -> None:

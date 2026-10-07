@@ -39,7 +39,9 @@ class NotaRepositoryContract(Protocol):
     def listar_por_pessoa_unicas(self, pessoa_id: UUID) -> list[NotaFiscal]:
         raise NotImplementedError
 
-    def obter_proxima_para_processamento(self) -> NotaFiscal | None:
+    def obter_proxima_para_processamento(
+        self, max_tentativas: int | None = None
+    ) -> NotaFiscal | None:
         raise NotImplementedError
 
 

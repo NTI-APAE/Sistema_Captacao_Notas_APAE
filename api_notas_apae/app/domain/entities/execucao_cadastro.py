@@ -70,6 +70,46 @@ class ExecucaoCadastro:
         self.tempo_segundos = tempo_segundos
         self.finalizado_em = finalizado_em
 
+    def marcar_duplicada(
+        self,
+        mensagem: str | None,
+        valor: Decimal | None,
+        data_emissao: date | None,
+        tempo_segundos: Decimal | None,
+        finalizado_em: datetime,
+    ) -> None:
+        if self._resultado_repetido(
+            ExecucaoStatus.DUPLICADA, mensagem, valor, data_emissao
+        ):
+            return
+        self._garantir_pode_receber(ExecucaoStatus.DUPLICADA)
+        self.status = ExecucaoStatus.DUPLICADA
+        self.mensagem = mensagem
+        self.valor_obtido = valor
+        self.data_emissao_obtida = data_emissao
+        self.tempo_segundos = tempo_segundos
+        self.finalizado_em = finalizado_em
+
+    def marcar_ignorada(
+        self,
+        mensagem: str | None,
+        valor: Decimal | None,
+        data_emissao: date | None,
+        tempo_segundos: Decimal | None,
+        finalizado_em: datetime,
+    ) -> None:
+        if self._resultado_repetido(
+            ExecucaoStatus.IGNORADA, mensagem, valor, data_emissao
+        ):
+            return
+        self._garantir_pode_receber(ExecucaoStatus.IGNORADA)
+        self.status = ExecucaoStatus.IGNORADA
+        self.mensagem = mensagem
+        self.valor_obtido = valor
+        self.data_emissao_obtida = data_emissao
+        self.tempo_segundos = tempo_segundos
+        self.finalizado_em = finalizado_em
+
     def aguardar_captcha(self, mensagem: str | None) -> None:
         if self.status == ExecucaoStatus.AGUARDANDO_CAPTCHA:
             self.mensagem = mensagem
@@ -95,7 +135,12 @@ class ExecucaoCadastro:
         self.finalizado_em = finalizado_em
 
     def _garantir_pode_receber(self, destino: ExecucaoStatus) -> None:
-        if self.status in {ExecucaoStatus.SUCESSO, ExecucaoStatus.ERRO}:
+        if self.status in {
+            ExecucaoStatus.SUCESSO,
+            ExecucaoStatus.DUPLICADA,
+            ExecucaoStatus.IGNORADA,
+            ExecucaoStatus.ERRO,
+        }:
             raise ResultadoExecucaoConflitanteException()
         if self.status not in {
             ExecucaoStatus.EM_EXECUCAO,
@@ -117,6 +162,10 @@ class ExecucaoCadastro:
             return False
         if self.mensagem != mensagem:
             return False
-        if destino != ExecucaoStatus.SUCESSO:
+        if destino not in {
+            ExecucaoStatus.SUCESSO,
+            ExecucaoStatus.DUPLICADA,
+            ExecucaoStatus.IGNORADA,
+        }:
             return True
         return self.valor_obtido == valor and self.data_emissao_obtida == data_emissao

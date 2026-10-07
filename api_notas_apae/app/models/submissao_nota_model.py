@@ -20,6 +20,8 @@ class SubmissaoNotaModel(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True)
     pessoa_id: Mapped[UUID | None] = mapped_column(ForeignKey("pessoas.id"))
     mensagem_whatsapp_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    evento_instancia: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    evento_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     arquivo_importado_id: Mapped[UUID | None] = mapped_column(nullable=True)
     nota_fiscal_id: Mapped[UUID | None] = mapped_column(ForeignKey("notas_fiscais.id"))
     origem: Mapped[str] = mapped_column(String(40), index=True)

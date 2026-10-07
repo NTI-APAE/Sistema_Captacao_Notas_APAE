@@ -9,7 +9,7 @@ Recebe submissões manuais e imagens por uma rota interna autenticada.
 app/
   routes/          HTTP, autenticação da integração, validação e respostas.
   schemas/         Contratos HTTP e dados de entrada/saída dos serviços.
-  services/        Cadastro, consultas, worker, leitura QR e processamento de imagem.
+  services/        Cadastro, consultas, worker, leitura QR/OCR e processamento de imagem.
   repositories/    SQLAlchemy, conversões e controle de transações.
   models/          Tabelas persistidas, incluindo recibos de eventos de imagem.
   domain/          Regras de estado e entidades existentes preservadas.
@@ -68,28 +68,37 @@ submeteu a mesma nota várias vezes, a nota aparece uma única vez.
 ## Endpoints
 
 - `GET /health`
-- `POST /submissoes`
-- `POST /notas/processar-imagem` (interno, autenticado, corpo binário)
-- `GET /notas`
-- `GET /notas/{id}`
-- `GET /notas/chave/{chave}`
-- `GET /notas/{id}/submissoes`
-- `POST /notas/{id}/execucoes`
-- `GET /notas/{id}/execucoes`
-- `POST /notas/{id}/resultado-cadastro`
-- `POST /notas/{id}/reprocessar`
-- `GET /pessoas/{id}`
-- `GET /pessoas/telefone/{telefone}`
-- `GET /pessoas/{id}/notas`
+- `POST /integracao/notas/importar-txt` (interno, autenticado)
+- `POST /notas/processar-imagem` (interno, autenticado, multipart)
+- `GET /notas` (worker, autenticado)
+- `GET /notas/{id}` (worker, autenticado)
 - `POST /worker/notas/proxima`
 - `GET /worker/execucoes/{execucao_id}`
 - `POST /worker/execucoes/{execucao_id}/resultado`
+
+Na rota de processamento de imagem, o OpenCV tenta primeiro extrair a chave pelo
+QR Code. Somente quando nenhum conteúdo do QR resulta em uma chave fiscal válida,
+a API executa OCR na faixa acima do QR Code. O resultado do OCR também precisa
+conter 44 dígitos e passar pelo dígito verificador. Para habilitar esse fallback,
+instale o pacote Python `pytesseract` e o executável Tesseract OCR; em Windows,
+quando ele não estiver no `PATH`, configure `TESSERACT_CMD` com o caminho do
+executável.
 
 ## Contrato Worker
 
 Os endpoints `/worker/*` são o contrato oficial entre a API e o
 Worker/Automatizador externo. Todos exigem o header `X-Worker-API-Key` com o
 valor configurado em `WORKER_API_KEY`.
+
+O leitor desktop usa `POST /integracao/notas/importar-txt` com o header
+`X-Internal-API-Key` configurado em `NOTAS_API_INTERNAL_KEY`. O corpo contém as
+chaves extraídas do TXT; a API cria ou reativa as notas diretamente no banco
+central. Depois, o leitor reserva cada nota pelos endpoints `/worker/*` e envia
+o resultado do cadastro para a mesma execução.
+
+As consultas operacionais `GET /notas` e `GET /notas/{id}`, usadas pelo leitor
+desktop, também exigem o header `X-Worker-API-Key` configurado em
+`WORKER_API_KEY`.
 
 `POST /worker/notas/proxima` reserva atomicamente a próxima nota `PENDENTE`,
 cria uma `ExecucaoCadastro` em `EM_EXECUCAO`, marca a nota como `CADASTRANDO` e
@@ -153,8 +162,8 @@ venv/Scripts/python.exe api_notas_apae/run_local.py
 ```
 
 O inicializador lê o `.env` próprio da API, se existir. Se não houver segredo no
-ambiente, lê **somente** NOTAS_INTERNAL_API_KEY ou WEBHOOK_TOKEN do `.env` da
-Evolution. Não importa DATABASE_URL desse arquivo nem modifica credenciais.
+ambiente, lê **somente** NOTAS_API_INTERNAL_KEY do `.env` da Evolution. Não
+importa DATABASE_URL desse arquivo nem modifica credenciais.
 Uma DATABASE_URL já definida no terminal continua tendo precedência: confirme
 que aponta para o banco de notas correto antes de executar migrations.
 
@@ -164,8 +173,8 @@ Em outro terminal, na raiz:
 venv/Scripts/python.exe -m uvicorn EvolutionAPI.webhook:app --host 0.0.0.0 --port 8001 --env-file EvolutionAPI/.env
 ```
 
-Para execução convencional, configure NOTAS_INTERNAL_API_KEY (ou WEBHOOK_TOKEN)
-no ambiente da API e execute:
+Para execução convencional, configure NOTAS_API_INTERNAL_KEY no ambiente da API
+e execute:
 
 ```powershell
 venv/Scripts/python.exe -m uvicorn app.main:app --app-dir api_notas_apae --host 0.0.0.0 --port 8000

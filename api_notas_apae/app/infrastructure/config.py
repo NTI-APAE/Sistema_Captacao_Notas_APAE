@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     )
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     worker_api_key: str = Field(default="", alias="WORKER_API_KEY")
-    notas_internal_api_key: str = Field(default="", alias="NOTAS_INTERNAL_API_KEY")
-    webhook_token: str = Field(default="", alias="WEBHOOK_TOKEN")
+    worker_max_attempts: int = Field(default=3, ge=1, alias="WORKER_MAX_ATTEMPTS")
+    notas_api_internal_key: str = Field(default="", alias="NOTAS_API_INTERNAL_KEY")
     worker_execution_timeout_minutes: int = Field(
         default=30,
         alias="WORKER_EXECUTION_TIMEOUT_MINUTES",

@@ -10,6 +10,7 @@ from app.infrastructure.admin_auth import password_hash
 from app.infrastructure.admin_reporting_dependencies import get_admin_reporting_service
 from app.main import create_app
 from app.models.consentimento_model import ConsentimentoModel as C
+from app.models.evento_imagem import EventoImagem as E
 from app.models.nota_fiscal_model import NotaFiscalModel as N
 from app.models.pessoa_model import PessoaModel as P
 from app.models.submissao_nota_model import SubmissaoNotaModel as S
@@ -59,6 +60,23 @@ def admin_data(session_factory):
                     status="DUPLICADA",
                     origem="WHATSAPP",
                     data_recebimento=now,
+                    evento_instancia="teste2",
+                    evento_id="msg-admin",
+                ),
+                E(
+                    origem="WHATSAPP",
+                    instancia="teste2",
+                    evento_id="msg-admin",
+                    fingerprint="f" * 64,
+                    resultado={"saved": True},
+                    remote_jid="559899991234@s.whatsapp.net",
+                    from_me=False,
+                    message_type="imageMessage",
+                    data_mensagem=datetime(2026, 9, 28, 2, 59, tzinfo=UTC),
+                    criado_em=now,
+                    push_name="Ana",
+                    mimetype="image/png",
+                    caption="nota da Ana",
                 ),
                 C(
                     id=uuid4(),
@@ -98,6 +116,8 @@ def test_resumo_json_e_privacidade(admin_client):
     result = response.json()
     assert result["indicadores"]["total"] == 1
     assert result["indicadores"]["notas"] == 1
+    assert result["indicadores"]["notas_leitor"] == 0
+    assert result["indicadores"]["reenvios_mensagens"] == 0
     assert len(result["series"]) == 30
     assert dict(result["status_submissoes"])["DUPLICADA"] == 1
     assert "559899991234" not in response.text
@@ -122,6 +142,40 @@ def test_lista_json_filtrada_e_paginada(admin_client):
     assert "imagem_path" not in row
 
 
+def test_lista_inclui_nota_importada_pelo_leitor(admin_client, session_factory):
+    nota_id = uuid4()
+    chave = "3" * 44
+    now = datetime(2026, 9, 29, 3, tzinfo=UTC)
+    with session_factory() as session:
+        session.add(
+            N(
+                id=nota_id,
+                chave=chave,
+                status="PENDENTE",
+                criado_em=now,
+                atualizado_em=now,
+            )
+        )
+        session.commit()
+
+    response = admin_client.get("/admin/relatorios/notas?chave=3333")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["total"] == 1
+    assert result["items"][0]["origem"] == "LEITOR_NOTA_FISCAL"
+    assert result["items"][0]["status"] == "IMPORTADO"
+    assert result["items"][0]["cadastro"] == "PENDENTE"
+
+    summary = admin_client.get("/admin/relatorios/resumo")
+    assert summary.status_code == 200
+    assert summary.json()["indicadores"]["notas_leitor"] == 1
+
+    detail = admin_client.get(f"/admin/relatorios/notas/{nota_id}")
+    assert detail.status_code == 200
+    assert detail.json()["origem"] == "LEITOR_NOTA_FISCAL"
+    assert detail.json()["nota_fiscal_id"] == str(nota_id)
+
+
 def test_contatos_json_e_ultimo_consentimento(admin_client):
     response = admin_client.get("/admin/relatorios/contatos?ligacao=false")
     assert response.status_code == 200
@@ -136,6 +190,11 @@ def test_detalhes_json_explicitos(admin_client, admin_data):
     note = admin_client.get(f"/admin/relatorios/notas/{admin_data['dup']}")
     assert note.status_code == 200
     assert note.json()["chave"] == "2" * 44
+    assert note.json()["whatsapp_instance"] == "teste2"
+    assert note.json()["whatsapp_message_id"] == "msg-admin"
+    assert note.json()["whatsapp_caption"] == "nota da Ana"
+    assert note.json()["atraso_processamento_segundos"] == 60
+    assert note.json()["historico_mensagens"][0]["message_id"] == "msg-admin"
     assert "mensagem_status" not in note.json()
     assert "secret-internal" not in note.text
     contact = admin_client.get(f"/admin/relatorios/contatos/{admin_data['ana']}?size=1")

@@ -19,13 +19,19 @@ from app.schemas.worker_output import (
 
 
 class ObterProximaNotaParaProcessamentoService:
-    def __init__(self, unit_of_work: Transaction) -> None:
+    def __init__(
+        self, unit_of_work: Transaction, max_attempts: int | None = None
+    ) -> None:
         self._unit_of_work = unit_of_work
+        self._max_attempts = max_attempts
         self._logger = logging.getLogger(__name__)
 
     def execute(self) -> ObterProximaNotaOutput | None:
         with self._unit_of_work as uow:
-            nota = uow.notas.obter_proxima_para_processamento()
+            if self._max_attempts is None:
+                nota = uow.notas.obter_proxima_para_processamento()
+            else:
+                nota = uow.notas.obter_proxima_para_processamento(self._max_attempts)
             if nota is None:
                 self._logger.info(
                     "fila de notas vazia",

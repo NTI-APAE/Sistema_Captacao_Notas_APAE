@@ -7,11 +7,8 @@ from app.routes.admin_auth_routes import router as admin_auth_router
 from app.routes.admin_reporting_routes import router as admin_reporting_router
 from app.routes.health_routes import router as health_router
 from app.routes.imagens import router as imagens_router
+from app.routes.integracao_routes import router as integracao_router
 from app.routes.notas_routes import router as notas_router
-from app.routes.pessoas_routes import router as pessoas_router
-from app.routes.submissao_routes import (
-    router as submissao_router,
-)
 from app.routes.worker_routes import router as worker_router
 
 
@@ -26,10 +23,9 @@ def create_app() -> FastAPI:
     )
     register_exception_handlers(app)
     app.include_router(health_router)
-    app.include_router(submissao_router)
     app.include_router(imagens_router)
+    app.include_router(integracao_router)
     app.include_router(notas_router)
-    app.include_router(pessoas_router)
     app.include_router(worker_router)
     app.include_router(admin_auth_router)
     app.include_router(admin_reporting_router)

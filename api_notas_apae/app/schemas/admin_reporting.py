@@ -24,6 +24,24 @@ class Pagina[T](BaseModel):
     pages: int
 
 
+class MensagemWhatsAppDetalhe(AdminReportingDTO):
+    submissao_id: UUID
+    status: str
+    data_recebimento: datetime
+    instance: str
+    message_id: str
+    remote_jid: str
+    message_type: str | None
+    timestamp: datetime | None
+    processed_at: datetime | None
+    push_name: str | None
+    mimetype: str | None
+    caption: str | None
+    reenvios: int
+    last_replay_at: datetime | None
+    atraso_processamento_segundos: int | None
+
+
 class NotaDetalhe(AdminReportingDTO):
     id: UUID
     data_recebimento: datetime
@@ -40,6 +58,19 @@ class NotaDetalhe(AdminReportingDTO):
     data_cadastro: datetime | None
     valor: Decimal | None
     data_emissao: date | None
+    whatsapp_instance: str | None
+    whatsapp_message_id: str | None
+    whatsapp_remote_jid: str | None
+    whatsapp_message_type: str | None
+    whatsapp_timestamp: datetime | None
+    whatsapp_processed_at: datetime | None
+    whatsapp_push_name: str | None
+    whatsapp_mimetype: str | None
+    whatsapp_caption: str | None
+    whatsapp_replays: int | None
+    whatsapp_last_replay_at: datetime | None
+    atraso_processamento_segundos: int | None
+    historico_mensagens: list[MensagemWhatsAppDetalhe]
 
 
 class NotaLista(AdminReportingDTO):
@@ -52,6 +83,9 @@ class NotaLista(AdminReportingDTO):
     telefone: str | None
     chave: str | None
     cadastro: str | None
+    whatsapp_instance: str | None
+    whatsapp_timestamp: datetime | None
+    whatsapp_replays: int | None
 
     @field_validator("telefone")
     @classmethod
@@ -105,10 +139,12 @@ class Indicadores(BaseModel):
     duplicadas: int
     falhas: int
     notas: int
+    notas_leitor: int
     cadastradas: int
     contatos: int
     novos_contatos: int
     imagens_sem_chave: int
+    reenvios_mensagens: int
 
 
 class DiaRecebimento(BaseModel):

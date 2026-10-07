@@ -17,8 +17,8 @@ def test_resposta_perdida_apos_commit_nao_duplica(
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[4]))
     from EvolutionAPI import notas, webhook
 
-    monkeypatch.setenv("WEBHOOK_TOKEN", "test-token")
-    monkeypatch.setenv("NOTAS_INTERNAL_API_KEY", "test-internal")
+    monkeypatch.setenv("EVOLUTION_WEBHOOK_TOKEN", "test-token")
+    monkeypatch.setenv("NOTAS_API_INTERNAL_KEY", "test-internal")
     monkeypatch.setattr(
         webhook,
         "recuperar_imagem",

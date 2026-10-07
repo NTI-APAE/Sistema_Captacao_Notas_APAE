@@ -33,7 +33,7 @@ api_notas_apae/
     models/          modelos existentes e evento_imagem
     domain/          entidades, estados, enums e exceções existentes
     infrastructure/ configuração, injeção FastAPI, logs, segurança
-  alembic/           três migrations preservadas + 202609210001
+  alembic/           migrations preservadas + recibos e metadados de imagem
   tests/
     unit/services/   testes anteriores reorganizados
     unit/            QR, logs e migration
@@ -60,19 +60,26 @@ integração de imagens, nem serviços de fila, Redis ou factories.
 
 `POST /notas/processar-imagem`
 
-Corpo: bytes da imagem, `Content-Type: application/octet-stream`, máximo 10 MiB.
-Headers obrigatórios:
+Corpo: `multipart/form-data`, máximo 10 MiB.
 
-| Header | Conteúdo |
-|---|---|
-| X-Internal-API-Key | NOTAS_INTERNAL_API_KEY; fallback para WEBHOOK_TOKEN |
-| X-Telefone | 8 a 15 dígitos |
-| X-Origem | WHATSAPP, MANUAL ou ARQUIVO_TXT |
-| X-Instancia | Identificador da instância/sistema de origem (até 100 caracteres) |
-| X-Evento-ID | ID estável da mensagem/evento (até 255 caracteres) |
+| Campo | Obrigatório | Conteúdo |
+|---|---|---|
+| imagem | sim | Arquivo binário de imagem |
+| message_id | sim | ID estável da mensagem, até 255 caracteres |
+| instance | sim | Instância Evolution, até 100 caracteres |
+| remote_jid | sim | JID remoto recebido no evento |
+| from_me | não | Booleano; o webhook não encaminha mensagens próprias |
+| message_type | não | Normalmente `imageMessage` |
+| timestamp | não | `data.messageTimestamp` da Evolution |
+| push_name | não | `data.pushName` |
+| mimetype | não | `message.imageMessage.mimetype` |
+| caption | não | `message.imageMessage.caption` |
+| remote_jid_alt | não | `key.remoteJidAlt`, usado para LIDs |
 
-A origem não altera o algoritmo de imagem. Outro sistema pode reutilizar a rota
-com sua origem, identificador e segredo. Os metadados não vão na query string.
+O header `X-Internal-API-Key` deve conter `NOTAS_API_INTERNAL_KEY`. A API usa
+`instance + message_id` junto de `origem=WHATSAPP` como identidade idempotente.
+O `remote_jid` é normalizado para identificar o contato; a mídia e o payload
+bruto não são persistidos.
 
 Resposta 200 inclui received, saved, replayed, qr_code_found, reason,
 urls_consulta e submissoes (status, duplicada, nota_id, submissao_id). Os campos
@@ -80,7 +87,7 @@ já usados pelo webhook, received/saved/submissoes, foram preservados; os demais
 são aditivos. A mídia e o payload bruto não são persistidos.
 
 Erros: 401 credencial inválida; 409 identidade reutilizada com conteúdo diferente;
-413 limite excedido; 415 content-type errado; 422 dados/imagem inválidos;
+413 limite excedido; 422 dados/imagem inválidos;
 503 integração não configurada ou persistência indisponível. O webhook propaga
 rejeições definitivas de imagem/evento e converte falhas de comunicação em
 502/504, sem confirmar salvamento. Há timeouts de 60 segundos; não há retry
@@ -88,12 +95,12 @@ interno automático. O remetente/Evolution deve reenviar após falha transitóri
 
 ## Idempotência e persistência
 
-A migration `202609210001_eventos_imagem.py` acrescenta somente eventos_imagem,
-com chave primária composta (origem, instancia, evento_id), fingerprint SHA-256,
-resultado JSON e data. Nenhuma migration anterior nem tabela existente foi
-removida ou alterada. A tabela mensagens_whatsapp já existente exige outros
-campos e tem unicidade global no ID; não foi reaproveitada porque isso exigiria
-alterar seu contrato e ainda não forneceria um recibo do resultado de imagem.
+A migration `202609210001_eventos_imagem.py` cria o recibo de imagem. A migration
+`202609300001_metadados_evento_imagem.py` acrescenta os metadados operacionais
+da mensagem ao recibo e vincula cada submissão WhatsApp ao evento por
+(origem, instance, message_id). Nenhuma migration anterior foi removida e a
+tabela mensagens_whatsapp não foi reaproveitada: ela tem outro contrato e
+unicidade global no ID.
 
 Reserva do evento, novas pessoas/notas, todas as submissões da imagem e resultado
 são confirmados juntos. Falha antes do commit reverte tudo. A PK composta resolve
@@ -115,8 +122,9 @@ reconhecê-las depois de receber os mesmos bytes e metadados.
 
 As portas 8000/8001, bancos 5432/5433, nomes de containers e Compose foram
 preservados nesta refatoração. Os .env reais não foram modificados. A nova API
-mantém POST /submissoes para clientes antigos, mas o novo webhook precisa da
-nova rota e da migration. Por isso os processos ativos NÃO foram reiniciados e
+não expõe mais POST /submissoes; o webhook usa a nova rota de
+processamento de imagem e a migration correspondente. Por isso os processos ativos
+NÃO foram reiniciados e
 a migration NÃO foi aplicada ao banco em uso.
 
 Siga a instalação, migration e inicialização descritas no [README](README.md).
@@ -204,13 +212,16 @@ integrações de persistência usam SQLite temporário; isso não substitui uma
 validação de concorrência no PostgreSQL de homologação. Nada foi aplicado ao
 PostgreSQL em uso. Teste real com uma nova mensagem fica para depois da ativação.
 
-Não foram implementados OCR, dashboard, consentimentos, resposta automática ao
-doador, scheduler ou cadastro SEFAZ. Não há fila durável; falhas precisam de
+O dashboard administrativo exibe instância, ID/JID, data/hora da mensagem,
+atraso até o processamento, legenda, MIME, tipo, reenvios do mesmo evento e o
+histórico de mensagens diferentes que geraram a mesma nota. Não foram
+implementados OCR, resposta automática ao doador, scheduler ou cadastro SEFAZ.
+Não há fila durável; falhas precisam de
 reentrega. O limite de 10 MiB é de bytes comprimidos, não de memória decodificada:
 para exposição a tráfego não confiável ainda é recomendável limitar recursos do
 processo OpenCV. As URLs retornadas são texto não confiável, nunca consultadas.
 
-Resultado final: **71 testes passaram**; Ruff da API e do webhook sem erros;
+Resultado final: **92 testes passaram**; Ruff da API e do webhook sem erros;
 `git diff --check` sem erros; SQL da migration PostgreSQL gerado com sucesso.
 Há dois avisos de depreciação do TestClient/Starlette, sem falhas.
 O inicializador também foi verificado sem subir servidor: segredo carregado e

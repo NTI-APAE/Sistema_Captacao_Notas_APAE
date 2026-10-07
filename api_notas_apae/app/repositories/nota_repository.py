@@ -1,13 +1,12 @@
 from uuid import UUID
 
-from sqlalchemy import select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.domain.entities.nota_fiscal import NotaFiscal
 from app.domain.enums.nota_status import NotaStatus
-from app.models.nota_fiscal_model import (
-    NotaFiscalModel,
-)
+from app.models.execucao_cadastro_model import ExecucaoCadastroModel
+from app.models.nota_fiscal_model import NotaFiscalModel
 from app.models.pessoa_model import PessoaModel
 from app.models.submissao_nota_model import (
     SubmissaoNotaModel,
@@ -101,12 +100,36 @@ class SQLAlchemyNotaRepository:
         ).all()
         return [NotaFiscalMapper.to_domain(model) for model in models]
 
-    def obter_proxima_para_processamento(self) -> NotaFiscal | None:
+    def obter_proxima_para_processamento(
+        self, max_tentativas: int | None = None
+    ) -> NotaFiscal | None:
         self._acquire_sqlite_claim_lock()
+        statement = select(NotaFiscalModel).where(
+            NotaFiscalModel.status.in_(
+                [
+                    NotaStatus.PENDENTE.value,
+                    NotaStatus.ERRO_CADASTRO.value,
+                    NotaStatus.PAUSADA.value,
+                ],
+            ),
+        )
+        if max_tentativas is not None:
+            tentativas = (
+                select(func.count(ExecucaoCadastroModel.id))
+                .where(
+                    ExecucaoCadastroModel.nota_fiscal_id == NotaFiscalModel.id
+                )
+                .correlate(NotaFiscalModel)
+                .scalar_subquery()
+            )
+            statement = statement.where(
+                or_(
+                    NotaFiscalModel.status == NotaStatus.PENDENTE.value,
+                    tentativas < max_tentativas,
+                ),
+            )
         model = self._session.scalar(
-            select(NotaFiscalModel)
-            .where(NotaFiscalModel.status == NotaStatus.PENDENTE.value)
-            .order_by(NotaFiscalModel.criado_em.asc())
+            statement.order_by(NotaFiscalModel.criado_em.asc())
             .with_for_update(skip_locked=True)
             .limit(1),
         )

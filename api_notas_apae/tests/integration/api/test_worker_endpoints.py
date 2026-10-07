@@ -6,6 +6,22 @@ from fastapi.testclient import TestClient
 CHAVE = "21260912345678000123550010001234561234567890"
 CHAVE_2 = "21260912345678000123550010001234561234567891"
 HEADERS = {"X-Worker-API-Key": "test-worker-key"}
+INTERNAL_HEADERS = {"X-Internal-API-Key": "test-internal-key"}
+
+
+def importar_nota(client: TestClient, chave: str) -> None:
+    response = client.post(
+        "/integracao/notas/importar-txt",
+        headers=INTERNAL_HEADERS,
+        json={
+            "nome_arquivo": "notas.txt",
+            "total_linhas": 1,
+            "total_invalidas": 0,
+            "total_duplicadas_txt": 0,
+            "chaves": [chave],
+        },
+    )
+    assert response.status_code == status.HTTP_200_OK
 
 
 def test_worker_rejeita_sem_api_key(client: TestClient) -> None:
@@ -31,10 +47,7 @@ def test_worker_claim_retorna_204_sem_trabalho(client: TestClient) -> None:
 
 
 def test_worker_claim_consulta_e_registra_resultado(client: TestClient) -> None:
-    client.post(
-        "/submissoes",
-        json={"telefone": "5598999999999", "origem": "MANUAL", "chave": CHAVE},
-    )
+    importar_nota(client, CHAVE)
 
     claim = client.post("/worker/notas/proxima", headers=HEADERS)
     execucao_id = claim.json()["execucao_id"]
@@ -79,10 +92,7 @@ def test_worker_claim_consulta_e_registra_resultado(client: TestClient) -> None:
 
 def test_worker_claim_concorrente_entrega_notas_diferentes(client: TestClient) -> None:
     for chave in [CHAVE, CHAVE_2]:
-        client.post(
-            "/submissoes",
-            json={"telefone": "5598999999999", "origem": "MANUAL", "chave": chave},
-        )
+        importar_nota(client, chave)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         responses = list(
@@ -100,10 +110,7 @@ def test_worker_claim_concorrente_entrega_notas_diferentes(client: TestClient) -
 
 
 def test_worker_claim_concorrente_com_uma_nota_retorna_204(client: TestClient) -> None:
-    client.post(
-        "/submissoes",
-        json={"telefone": "5598999999999", "origem": "MANUAL", "chave": CHAVE},
-    )
+    importar_nota(client, CHAVE)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         responses = list(

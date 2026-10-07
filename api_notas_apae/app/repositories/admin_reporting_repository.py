@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, literal, null, or_, select, union_all
 
 from app.models.consentimento_model import ConsentimentoModel as C
 from app.models.evento_imagem import EventoImagem as E
@@ -48,11 +48,19 @@ class AdminReportingRepository:
         result = dict(counts)
         result.update(
             notas=self.count(N),
+            notas_leitor=self.count(
+                N,
+                ~exists().where(S.nota_fiscal_id == N.id),
+            ),
             cadastradas=self.count(N, N.status == "CADASTRADA"),
             contatos=self.count(P),
             novos_contatos=self.count(P, P.criado_em >= mes, P.criado_em < fim),
             imagens_sem_chave=self.count(
                 E, E.resultado["saved"].as_boolean().is_(False)
+            ),
+            reenvios_mensagens=(
+                self.session.scalar(select(func.coalesce(func.sum(E.reenvios), 0)))
+                or 0
             ),
         )
         return result
@@ -83,7 +91,7 @@ class AdminReportingRepository:
         ).all()
 
     def _notas(self, filtro, pessoa_id=None):
-        query = (
+        submissao = (
             select(
                 S.id,
                 S.data_recebimento,
@@ -100,41 +108,85 @@ class AdminReportingRepository:
                 N.data_cadastro,
                 N.valor,
                 N.data_emissao,
+                E.instancia.label("whatsapp_instance"),
+                E.evento_id.label("whatsapp_message_id"),
+                E.remote_jid.label("whatsapp_remote_jid"),
+                E.message_type.label("whatsapp_message_type"),
+                E.data_mensagem.label("whatsapp_timestamp"),
+                E.criado_em.label("whatsapp_processed_at"),
+                E.push_name.label("whatsapp_push_name"),
+                E.mimetype.label("whatsapp_mimetype"),
+                E.caption.label("whatsapp_caption"),
+                E.reenvios.label("whatsapp_replays"),
+                E.ultimo_reenvio_em.label("whatsapp_last_replay_at"),
             )
             .outerjoin(P, S.pessoa_id == P.id)
             .outerjoin(N, S.nota_fiscal_id == N.id)
+            .outerjoin(
+                E,
+                (S.origem == E.origem)
+                & (S.evento_instancia == E.instancia)
+                & (S.evento_id == E.evento_id),
+            )
         )
+        nota_importada = select(
+            N.id.label("id"),
+            N.criado_em.label("data_recebimento"),
+            literal("IMPORTADO").label("status"),
+            literal("LEITOR_NOTA_FISCAL").label("origem"),
+            null().label("pessoa_id"),
+            N.id.label("nota_fiscal_id"),
+            null().label("mensagem_whatsapp_id"),
+            null().label("erro_codigo"),
+            N.chave.label("chave"),
+            null().label("nome"),
+            null().label("telefone"),
+            N.status.label("cadastro"),
+            N.data_cadastro,
+            N.valor,
+            N.data_emissao,
+            null().label("whatsapp_instance"),
+            null().label("whatsapp_message_id"),
+            null().label("whatsapp_remote_jid"),
+            null().label("whatsapp_message_type"),
+            null().label("whatsapp_timestamp"),
+            null().label("whatsapp_processed_at"),
+            null().label("whatsapp_push_name"),
+            null().label("whatsapp_mimetype"),
+            null().label("whatsapp_caption"),
+            null().label("whatsapp_replays"),
+            null().label("whatsapp_last_replay_at"),
+        ).where(~exists().where(S.nota_fiscal_id == N.id))
+        registros = union_all(submissao, nota_importada).subquery("notas_admin")
+        query = select(registros)
         if pessoa_id:
-            query = query.where(S.pessoa_id == pessoa_id)
+            query = query.where(registros.c.pessoa_id == pessoa_id)
         if filtro.inicio:
-            query = query.where(S.data_recebimento >= filtro.inicio)
+            query = query.where(registros.c.data_recebimento >= filtro.inicio)
         if filtro.fim:
-            query = query.where(S.data_recebimento < filtro.fim)
+            query = query.where(registros.c.data_recebimento < filtro.fim)
         if filtro.status:
-            query = query.where(S.status == filtro.status.value)
+            query = query.where(registros.c.status == filtro.status.value)
         if filtro.cadastro:
-            query = query.where(N.status == filtro.cadastro.value)
+            query = query.where(registros.c.cadastro == filtro.cadastro.value)
         if filtro.duplicada is not None:
-            condition = S.status == "DUPLICADA"
+            condition = registros.c.status == "DUPLICADA"
             query = query.where(condition if filtro.duplicada else ~condition)
         if filtro.telefone:
             digits = "".join(c for c in filtro.telefone if c.isdigit())
             query = query.where(
-                P.telefone.contains(digits or "invalid", autoescape=True)
+                registros.c.telefone.contains(digits or "invalid", autoescape=True)
             )
         if filtro.chave:
             query = query.where(
-                func.coalesce(S.chave_extraida, N.chave).contains(
-                    filtro.chave, autoescape=True
-                )
+                registros.c.chave.contains(filtro.chave, autoescape=True)
             )
         if filtro.q:
             query = query.where(
                 or_(
-                    P.nome.icontains(filtro.q, autoescape=True),
-                    P.telefone.contains(filtro.q, autoescape=True),
-                    S.chave_extraida.contains(filtro.q, autoescape=True),
-                    N.chave.contains(filtro.q, autoescape=True),
+                    registros.c.nome.icontains(filtro.q, autoescape=True),
+                    registros.c.telefone.contains(filtro.q, autoescape=True),
+                    registros.c.chave.contains(filtro.q, autoescape=True),
                 )
             )
         return query
@@ -155,17 +207,58 @@ class AdminReportingRepository:
         }
 
     def notas(self, filtro, pessoa_id=None):
+        registros = self._notas(filtro, pessoa_id).subquery("notas_filtradas")
         return self.pagina(
-            self._notas(filtro, pessoa_id),
+            select(registros),
             filtro,
-            S.data_recebimento.desc(),
-            S.id.desc(),
+            registros.c.data_recebimento.desc(),
+            registros.c.id.desc(),
         )
 
     def nota(self, submissao_id, filtro):
-        row = self.session.execute(self._notas(filtro).where(S.id == submissao_id))
+        registros = self._notas(filtro).subquery("notas_filtradas")
+        row = self.session.execute(
+            select(registros).where(registros.c.id == submissao_id)
+        )
         result = row.mappings().first()
-        return dict(result) if result else None
+        if result is None:
+            return None
+        result = dict(result)
+        result["historico_mensagens"] = (
+            self.mensagens_da_nota(result["nota_fiscal_id"])
+            if result["nota_fiscal_id"]
+            else []
+        )
+        return result
+
+    def mensagens_da_nota(self, nota_fiscal_id):
+        query = (
+            select(
+                S.id.label("submissao_id"),
+                S.status,
+                S.data_recebimento,
+                E.instancia.label("instance"),
+                E.evento_id.label("message_id"),
+                E.remote_jid,
+                E.message_type,
+                E.data_mensagem.label("timestamp"),
+                E.criado_em.label("processed_at"),
+                E.push_name,
+                E.mimetype,
+                E.caption,
+                E.reenvios,
+                E.ultimo_reenvio_em.label("last_replay_at"),
+            )
+            .join(
+                E,
+                (S.origem == E.origem)
+                & (S.evento_instancia == E.instancia)
+                & (S.evento_id == E.evento_id),
+            )
+            .where(S.nota_fiscal_id == nota_fiscal_id)
+            .order_by(E.data_mensagem.desc().nullslast(), S.data_recebimento.desc())
+        )
+        return [dict(row) for row in self.session.execute(query).mappings()]
 
     def _contatos(self):
         totals = (

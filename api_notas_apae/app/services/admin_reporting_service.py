@@ -11,6 +11,35 @@ class AdminReportingService:
     def __init__(self, repository):
         self.repository = repository
 
+    @staticmethod
+    def _delay(start, end):
+        if start is None or end is None:
+            return None
+        return max(0, int((end - start).total_seconds()))
+
+    @classmethod
+    def _decorate_message(cls, item):
+        item["atraso_processamento_segundos"] = cls._delay(
+            item.get("timestamp"), item.get("processed_at")
+        )
+        return item
+
+    @classmethod
+    def _decorate_note(cls, item):
+        item["atraso_processamento_segundos"] = cls._delay(
+            item.get("whatsapp_timestamp"), item.get("whatsapp_processed_at")
+        )
+        item["historico_mensagens"] = [
+            cls._decorate_message(message)
+            for message in item.get("historico_mensagens", [])
+        ]
+        return item
+
+    @classmethod
+    def _decorate_page(cls, page):
+        page["items"] = [cls._decorate_note(item) for item in page["items"]]
+        return page
+
     def resumo(self, hoje=None):
         hoje = hoje or datetime.now(TIMEZONE).date()
         inicio = hoje - timedelta(days=29)
@@ -29,14 +58,15 @@ class AdminReportingService:
             "maximo": max(1, max(item["total"] for item in series)),
             "status_submissoes": self.repository.por_status(SubmissaoNotaModel),
             "status_notas": self.repository.por_status(NotaFiscalModel),
-            "result": self.repository.notas(AdminReportingFilter(size=8)),
+            "result": self.notas(AdminReportingFilter(size=8)),
         }
 
     def notas(self, filtro, pessoa_id=None):
-        return self.repository.notas(filtro, pessoa_id)
+        return self._decorate_page(self.repository.notas(filtro, pessoa_id))
 
     def nota(self, nota_id):
-        return self.repository.nota(nota_id, AdminReportingFilter())
+        item = self.repository.nota(nota_id, AdminReportingFilter())
+        return self._decorate_note(item) if item else None
 
     def contatos(self, filtro):
         return self.repository.contatos(filtro)

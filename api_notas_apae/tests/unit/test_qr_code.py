@@ -1,5 +1,7 @@
 from unittest.mock import Mock
 
+import cv2
+import numpy as np
 import pytest
 
 from app.services import qr_code
@@ -58,3 +60,38 @@ def test_todas_as_etapas_preservadas(monkeypatch, imagem_sem_qr, chave_valida):
     assert qr_code.ler_qr_code(imagem_sem_qr) == [chave_valida]
     shapes = [call.args[0].shape for call in detector.detectAndDecode.call_args_list]
     assert shapes == [(100, 100, 3), (100, 100), (300, 300), (300, 300), (300, 300)]
+
+
+def test_ocr_extrai_chave_formatada_na_faixa_superior(
+    monkeypatch, imagem_sem_qr, chave_valida
+):
+    texto = " ".join(chave_valida[index : index + 4] for index in range(0, 44, 4))
+    ocr = Mock()
+    ocr.image_to_string.return_value = texto
+    monkeypatch.setattr(qr_code, "pytesseract", ocr)
+
+    assert qr_code.ler_chave_ocr(imagem_sem_qr) == [chave_valida]
+    imagem_ocr = ocr.image_to_string.call_args.args[0]
+    assert imagem_ocr.shape == (135, 300)
+
+
+def test_ocr_ignora_chave_com_digito_invalido(monkeypatch, imagem_sem_qr, chave_valida):
+    invalida = chave_valida[:-1] + str((int(chave_valida[-1]) + 1) % 10)
+    ocr = Mock()
+    ocr.image_to_string.return_value = invalida
+    monkeypatch.setattr(qr_code, "pytesseract", ocr)
+
+    assert qr_code.ler_chave_ocr(imagem_sem_qr) == []
+
+
+def test_ocr_prioriza_regiao_acima_do_qr(monkeypatch, imagem_qr, chave_valida):
+    ocr = Mock()
+    ocr.image_to_string.return_value = chave_valida
+    monkeypatch.setattr(qr_code, "pytesseract", ocr)
+
+    assert qr_code.ler_chave_ocr(imagem_qr) == [chave_valida]
+    imagem_ocr = ocr.image_to_string.call_args.args[0]
+    imagem_original = cv2.imdecode(
+        np.frombuffer(imagem_qr, dtype=np.uint8), cv2.IMREAD_COLOR
+    )
+    assert imagem_ocr.shape[0] < imagem_original.shape[0] * 3

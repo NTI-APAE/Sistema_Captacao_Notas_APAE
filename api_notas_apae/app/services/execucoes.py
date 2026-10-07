@@ -89,6 +89,24 @@ class RegistrarResultadoCadastroService:
                 if nota.status != NotaStatus.CADASTRADA:
                     nota.marcar_cadastrada(data.valor, data.data_emissao, agora)
                     nota.mensagem_status = data.mensagem
+            elif data.status == ExecucaoStatus.DUPLICADA:
+                execucao.marcar_duplicada(
+                    data.mensagem,
+                    data.valor,
+                    data.data_emissao,
+                    tempo_segundos,
+                    agora,
+                )
+                nota.marcar_duplicada(data.mensagem)
+            elif data.status == ExecucaoStatus.IGNORADA:
+                execucao.marcar_ignorada(
+                    data.mensagem,
+                    data.valor,
+                    data.data_emissao,
+                    tempo_segundos,
+                    agora,
+                )
+                nota.marcar_ignorada(data.mensagem)
             elif data.status == ExecucaoStatus.ERRO:
                 execucao.marcar_erro(data.mensagem, tempo_segundos, agora)
                 if nota.status != NotaStatus.ERRO_CADASTRO:

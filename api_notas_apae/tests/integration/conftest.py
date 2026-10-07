@@ -37,6 +37,7 @@ def client(
     monkeypatch: pytest.MonkeyPatch,
 ) -> TestClient:
     monkeypatch.setenv("WORKER_API_KEY", "test-worker-key")
+    monkeypatch.setenv("NOTAS_API_INTERNAL_KEY", "test-internal-key")
     get_settings.cache_clear()
     app = create_app()
 
