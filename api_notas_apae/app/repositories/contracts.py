@@ -65,6 +65,9 @@ class ExecucaoCadastroRepositoryContract(Protocol):
     def buscar_por_id(self, execucao_id: UUID) -> ExecucaoCadastro | None:
         raise NotImplementedError
 
+    def buscar_por_id_com_lock(self, execucao_id: UUID) -> ExecucaoCadastro | None:
+        raise NotImplementedError
+
     def listar_por_nota(self, nota_id: UUID) -> list[ExecucaoCadastro]:
         raise NotImplementedError
 
@@ -81,6 +84,24 @@ class ExecucaoCadastroRepositoryContract(Protocol):
         self,
         limite_iniciado_em,
     ) -> list[ExecucaoCadastro]:
+        raise NotImplementedError
+
+    def listar_abandonadas_com_lock(
+        self, agora, limite_legacy
+    ) -> list[ExecucaoCadastro]:
+        raise NotImplementedError
+
+    def salvar_heartbeat(
+        self,
+        execucao_id: UUID,
+        *,
+        worker_id: str,
+        agora,
+        lease_expira_em,
+    ) -> ExecucaoCadastro | None:
+        raise NotImplementedError
+
+    def listar_reconciliacoes(self) -> list[ExecucaoCadastro]:
         raise NotImplementedError
 
 

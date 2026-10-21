@@ -15,3 +15,4 @@ class RegistrarResultadoCadastroInput:
     valor: Decimal | None = None
     data_emissao: date | None = None
     tempo_segundos: Decimal | None = None
+    worker_id: str | None = None

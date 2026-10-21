@@ -12,6 +12,9 @@ from app.domain.exceptions.execucao_nao_encontrada_exception import (
 from app.domain.exceptions.nota_nao_encontrada_exception import (
     NotaNaoEncontradaException,
 )
+from app.domain.exceptions.resultado_execucao_conflitante_exception import (
+    ResultadoExecucaoConflitanteException,
+)
 from app.domain.exceptions.transicao_status_invalida_exception import (
     TransicaoStatusInvalidaException,
 )
@@ -66,17 +69,31 @@ class RegistrarResultadoCadastroService:
         data: RegistrarResultadoCadastroInput,
     ) -> ExecucaoCadastroOutput:
         with self._unit_of_work as uow:
-            execucao = uow.execucoes.buscar_por_id(data.execucao_id)
+            execucao = uow.execucoes.buscar_por_id_com_lock(data.execucao_id)
             if execucao is None:
                 raise ExecucaoNaoEncontradaException(data.execucao_id)
             if data.nota_id is not None and execucao.nota_fiscal_id != data.nota_id:
                 raise ExecucaoNaoEncontradaException(data.execucao_id)
+            if (
+                data.worker_id is not None
+                and execucao.worker_id is not None
+                and data.worker_id != execucao.worker_id
+            ):
+                raise ResultadoExecucaoConflitanteException()
+            agora = utc_now()
+            if data.worker_id is not None and (
+                execucao.status == ExecucaoStatus.RESULTADO_DESCONHECIDO
+                or (
+                    execucao.lease_expira_em is not None
+                    and execucao.lease_expira_em <= agora
+                )
+            ):
+                raise ResultadoExecucaoConflitanteException()
 
             nota = uow.notas.buscar_por_id(execucao.nota_fiscal_id)
             if nota is None:
                 raise NotaNaoEncontradaException(execucao.nota_fiscal_id)
 
-            agora = utc_now()
             tempo_segundos = self._tempo_execucao(execucao, data, agora)
             if data.status == ExecucaoStatus.SUCESSO:
                 execucao.marcar_sucesso(
@@ -117,11 +134,23 @@ class RegistrarResultadoCadastroService:
             elif data.status == ExecucaoStatus.PAUSADA:
                 execucao.pausar(data.mensagem)
                 nota.pausar(data.mensagem)
+            elif data.status == ExecucaoStatus.RESULTADO_DESCONHECIDO:
+                execucao.marcar_resultado_desconhecido(data.mensagem or "", agora)
+                if nota.status != NotaStatus.RESULTADO_DESCONHECIDO:
+                    nota.marcar_resultado_desconhecido(data.mensagem)
             else:
                 raise TransicaoStatusInvalidaException(
                     execucao.status.value,
                     data.status.value,
                 )
+
+            if data.status in {
+                ExecucaoStatus.SUCESSO,
+                ExecucaoStatus.DUPLICADA,
+                ExecucaoStatus.IGNORADA,
+                ExecucaoStatus.ERRO,
+            }:
+                execucao.lease_expira_em = None
 
             uow.notas.salvar(nota)
             uow.execucoes.salvar(execucao)

@@ -109,7 +109,6 @@ class SQLAlchemyNotaRepository:
                 [
                     NotaStatus.PENDENTE.value,
                     NotaStatus.ERRO_CADASTRO.value,
-                    NotaStatus.PAUSADA.value,
                 ],
             ),
         )

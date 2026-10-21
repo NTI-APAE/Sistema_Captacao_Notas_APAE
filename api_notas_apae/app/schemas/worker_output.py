@@ -11,6 +11,8 @@ class ObterProximaNotaOutput:
     execucao_id: UUID
     chave: str
     tentativa: int
+    worker_id: str
+    lease_expira_em: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,3 +23,6 @@ class WorkerExecucaoOutput:
     status: ExecucaoStatus
     iniciado_em: datetime | None
     finalizado_em: datetime | None
+    ultimo_heartbeat_em: datetime | None = None
+    lease_expira_em: datetime | None = None
+    fase_portal: str = "RESERVADA"
