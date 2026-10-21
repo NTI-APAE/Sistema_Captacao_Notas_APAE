@@ -38,6 +38,7 @@ export function statusLabel(value: string): string {
     CADASTRANDO: "Cadastrando",
     AGUARDANDO_CAPTCHA: "Aguardando CAPTCHA",
     PAUSADA: "Pausada",
+    RESULTADO_DESCONHECIDO: "Resultado desconhecido",
     CADASTRADA: "Cadastrada",
     IGNORADA: "Ignorada",
     ERRO_CADASTRO: "Erro no cadastro",
