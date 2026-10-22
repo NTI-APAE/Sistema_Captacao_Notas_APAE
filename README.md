@@ -178,6 +178,15 @@ Pop-Location
 O dashboard usa a URL interna da API somente no servidor. Não transforme
 `NOTAS_API_URL` ou credenciais em variáveis `NEXT_PUBLIC_*`.
 
+## Deployment de produção
+
+O ambiente produtivo é separado do Compose de desenvolvimento e está descrito
+em [`deploy/production/README.md`](deploy/production/README.md). Ele mantém
+PostgreSQL, Redis, Evolution e o webhook sem portas publicadas, exige segredos
+injetados externamente, usa readiness da API e executa migrations somente por
+uma etapa controlada. TLS, proxy, firewall, backup/restore e a conexão externa
+do leitor ainda dependem da infraestrutura de homologação.
+
 ### Leitor desktop
 
 ```powershell
