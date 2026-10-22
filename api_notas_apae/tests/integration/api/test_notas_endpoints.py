@@ -1,6 +1,8 @@
 from fastapi import status
 from fastapi.testclient import TestClient
 
+from app.routes import health_routes
+
 CHAVE = "21260912345678000123550010001234561234567890"
 INTERNAL_HEADERS = {"X-Internal-API-Key": "test-internal-key"}
 WORKER_HEADERS = {"X-Worker-API-Key": "test-worker-key"}
@@ -26,6 +28,19 @@ def test_health(client: TestClient) -> None:
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {"status": "ok"}
+
+
+def test_readiness_consulta_o_banco(
+    client: TestClient,
+    session_factory,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(health_routes, "SessionLocal", session_factory)
+
+    response = client.get("/ready")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {"status": "ready"}
 
 
 def test_listar_notas_rejeita_sem_chave_do_worker(client: TestClient) -> None:
