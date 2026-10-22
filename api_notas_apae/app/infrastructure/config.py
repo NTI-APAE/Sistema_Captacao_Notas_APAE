@@ -27,6 +27,12 @@ class Settings(BaseSettings):
         default=30,
         alias="WORKER_EXECUTION_TIMEOUT_MINUTES",
     )
+    worker_heartbeat_interval_seconds: int = Field(
+        default=30, ge=5, alias="WORKER_HEARTBEAT_INTERVAL_SECONDS"
+    )
+    worker_lease_timeout_seconds: int = Field(
+        default=120, ge=15, alias="WORKER_LEASE_TIMEOUT_SECONDS"
+    )
     admin_session_cookie: str = Field(
         default="apae_session", alias="ADMIN_SESSION_COOKIE"
     )

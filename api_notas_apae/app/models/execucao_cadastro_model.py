@@ -52,6 +52,22 @@ class ExecucaoCadastroModel(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    worker_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ultimo_heartbeat_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    lease_expira_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    fase_portal: Mapped[str] = mapped_column(
+        String(40), nullable=False, server_default="RESERVADA"
+    )
+    efeito_externo_iniciado_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    motivo_recuperacao: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
