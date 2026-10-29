@@ -76,6 +76,8 @@ submeteu a mesma nota várias vezes, a nota aparece uma única vez.
 - `POST /worker/notas/proxima`
 - `GET /worker/execucoes/{execucao_id}`
 - `POST /worker/execucoes/{execucao_id}/resultado`
+- `POST /worker/execucoes/{execucao_id}/heartbeat`
+- `POST /worker/execucoes/{execucao_id}/retomar`
 
 Na rota de processamento de imagem, o OpenCV tenta primeiro extrair a chave pelo
 QR Code. Somente quando nenhum conteúdo do QR resulta em uma chave fiscal válida,
@@ -110,15 +112,19 @@ desktop, também exigem o header `X-Worker-API-Key` configurado em
 `WORKER_API_KEY`.
 
 `POST /worker/notas/proxima` reserva atomicamente a próxima nota `PENDENTE`,
-cria uma `ExecucaoCadastro` em `EM_EXECUCAO`, marca a nota como `CADASTRANDO` e
-retorna:
+cria uma `ExecucaoCadastro` em `EM_EXECUCAO`, marca a nota como `CADASTRANDO`,
+associa a reserva ao `X-Worker-ID` informado e cria um lease renovável. O
+intervalo de heartbeat deve ser menor que `WORKER_LEASE_TIMEOUT_SECONDS`.
+O retorno inclui:
 
 ```json
 {
   "nota_id": "uuid",
   "execucao_id": "uuid",
   "chave": "21260912345678000123550010001234561234567890",
-  "tentativa": 1
+  "tentativa": 1,
+  "worker_id": "leitor-desktop",
+  "lease_expira_em": "2026-10-21T12:02:00+00:00"
 }
 ```
 
@@ -140,15 +146,32 @@ divergentes.
 ```
 
 `GET /worker/execucoes/{execucao_id}` permite consultar status, tentativa,
-nota vinculada e datas da execução.
+nota vinculada, fase do portal, heartbeat e validade do lease. O worker deve
+enviar heartbeats com a fase `PORTAL_INICIADO`, `AGUARDANDO_CAPTCHA`, `PAUSADA`
+ou `RESULTADO_ENVIANDO`. `retomar` continua a mesma tentativa após CAPTCHA ou
+pausa; não cria uma nova execução.
 
 O claim concorrente usa `SELECT ... FOR UPDATE SKIP LOCKED` no adapter
 SQLAlchemy para PostgreSQL. O cálculo de `tentativa` continua protegido pela
 constraint única `(nota_fiscal_id, tentativa)`.
 
-Execuções em andamento antigas podem ser recuperadas chamando
-`RecuperarExecucoesExpiradasService`, usando o limite configurado por
-`WORKER_EXECUTION_TIMEOUT_MINUTES`. Não há scheduler embutido nesta entrega.
+Execuções em andamento antigas podem ser recuperadas com o comando operacional:
+
+```powershell
+Push-Location api_notas_apae
+..\\venv\\Scripts\\python.exe -m app.cli.recover_worker recover
+..\\venv\\Scripts\\python.exe -m app.cli.recover_worker list
+..\\venv\\Scripts\\python.exe -m app.cli.recover_worker reconcile `
+  --execucao-id <uuid> --status SUCESSO --mensagem "confirmado no portal"
+Pop-Location
+```
+
+Reservas que expiraram antes do início do portal retornam para `PENDENTE`.
+Quando já houve efeito externo, ou a execução estava em CAPTCHA/pausa, a API
+marca a nota e a execução como `RESULTADO_DESCONHECIDO`; ela não é reencaminhada
+automaticamente. A reconciliação exige confirmação operacional do portal e
+registra um resultado final idempotente. O comando usa a conexão do banco e não
+fica exposto como endpoint HTTP. Não há scheduler embutido nesta entrega.
 
 ## Executar e testar
 

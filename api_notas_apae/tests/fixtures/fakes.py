@@ -122,6 +122,9 @@ class FakeExecucaoCadastroRepository:
     def buscar_por_id(self, execucao_id: UUID) -> ExecucaoCadastro | None:
         return self._execucoes.get(execucao_id)
 
+    def buscar_por_id_com_lock(self, execucao_id: UUID) -> ExecucaoCadastro | None:
+        return self._execucoes.get(execucao_id)
+
     def listar_por_nota(self, nota_id: UUID) -> list[ExecucaoCadastro]:
         return [
             execucao
@@ -153,6 +156,53 @@ class FakeExecucaoCadastroRepository:
             if execucao.status == ExecucaoStatus.EM_EXECUCAO
             and execucao.iniciado_em is not None
             and execucao.iniciado_em < limite_iniciado_em
+        ]
+
+    def listar_abandonadas_com_lock(self, agora, limite_legacy):
+        return [
+            execucao
+            for execucao in self._execucoes.values()
+            if execucao.status
+            in {
+                ExecucaoStatus.EM_EXECUCAO,
+                ExecucaoStatus.AGUARDANDO_CAPTCHA,
+                ExecucaoStatus.PAUSADA,
+            }
+            and (
+                (
+                    execucao.lease_expira_em is not None
+                    and execucao.lease_expira_em < agora
+                )
+                or (
+                    execucao.lease_expira_em is None
+                    and execucao.iniciado_em is not None
+                    and execucao.iniciado_em < limite_legacy
+                )
+            )
+        ]
+
+    def salvar_heartbeat(
+        self,
+        execucao_id,
+        *,
+        worker_id,
+        agora,
+        lease_expira_em,
+    ):
+        execucao = self._execucoes.get(execucao_id)
+        if execucao is not None:
+            execucao.renovar_lease(
+                worker_id=worker_id,
+                agora=agora,
+                lease_expira_em=lease_expira_em,
+            )
+        return execucao
+
+    def listar_reconciliacoes(self):
+        return [
+            execucao
+            for execucao in self._execucoes.values()
+            if execucao.status == ExecucaoStatus.RESULTADO_DESCONHECIDO
         ]
 
 

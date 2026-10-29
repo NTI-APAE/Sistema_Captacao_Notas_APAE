@@ -2,12 +2,14 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Header, Response, status
 
 from app.infrastructure.dependencies import (
     get_consultar_execucao_worker_service,
     get_obter_proxima_nota_worker_service,
+    get_registrar_heartbeat_worker_service,
     get_registrar_resultado_cadastro_service,
+    get_retomar_execucao_worker_service,
 )
 from app.infrastructure.worker_security import validate_worker_api_key
 from app.schemas.execucao_cadastro_input import (
@@ -18,6 +20,7 @@ from app.schemas.execucao_schemas import (
 )
 from app.schemas.worker_schemas import (
     WorkerExecucaoResponse,
+    WorkerHeartbeatRequest,
     WorkerNotaClaimResponse,
     WorkerResultadoRequest,
 )
@@ -27,6 +30,8 @@ from app.services.execucoes import (
 from app.services.worker import (
     ConsultarExecucaoWorkerService,
     ObterProximaNotaParaProcessamentoService,
+    RegistrarHeartbeatWorkerService,
+    RetomarExecucaoWorkerService,
 )
 
 router = APIRouter(
@@ -59,8 +64,9 @@ def obter_proxima_nota(
         ObterProximaNotaParaProcessamentoService,
         Depends(get_obter_proxima_nota_worker_service),
     ],
+    worker_id: str = Header(default="legacy-worker", alias="X-Worker-ID"),
 ) -> WorkerNotaClaimResponse | Response:
-    output = service.execute()
+    output = service.execute(worker_id=worker_id)
     if output is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     return WorkerNotaClaimResponse.from_output(output)
@@ -106,6 +112,7 @@ def registrar_resultado_worker(
         RegistrarResultadoCadastroService,
         Depends(get_registrar_resultado_cadastro_service),
     ],
+    worker_id: str = Header(default="legacy-worker", alias="X-Worker-ID"),
 ) -> ExecucaoCadastroResponse:
     output = service.execute(
         RegistrarResultadoCadastroInput(
@@ -115,6 +122,7 @@ def registrar_resultado_worker(
             valor=request.valor,
             data_emissao=request.data_emissao,
             tempo_segundos=request.tempo_segundos,
+            worker_id=worker_id,
         ),
     )
     logger.info(
@@ -127,3 +135,45 @@ def registrar_resultado_worker(
         },
     )
     return ExecucaoCadastroResponse.from_output(output)
+
+
+@router.post(
+    "/execucoes/{execucao_id}/heartbeat",
+    response_model=WorkerExecucaoResponse,
+    summary="Renovar lease da execucao",
+)
+def heartbeat_execucao(
+    execucao_id: UUID,
+    request: WorkerHeartbeatRequest,
+    service: Annotated[
+        RegistrarHeartbeatWorkerService,
+        Depends(get_registrar_heartbeat_worker_service),
+    ],
+    worker_id: str = Header(default="legacy-worker", alias="X-Worker-ID"),
+) -> WorkerExecucaoResponse:
+    return WorkerExecucaoResponse.from_output(
+        service.execute(
+            execucao_id,
+            worker_id=worker_id,
+            fase=request.fase,
+            mensagem=request.mensagem,
+        )
+    )
+
+
+@router.post(
+    "/execucoes/{execucao_id}/retomar",
+    response_model=WorkerExecucaoResponse,
+    summary="Retomar execucao pausada ou aguardando CAPTCHA",
+)
+def retomar_execucao(
+    execucao_id: UUID,
+    service: Annotated[
+        RetomarExecucaoWorkerService,
+        Depends(get_retomar_execucao_worker_service),
+    ],
+    worker_id: str = Header(default="legacy-worker", alias="X-Worker-ID"),
+) -> WorkerExecucaoResponse:
+    return WorkerExecucaoResponse.from_output(
+        service.execute(execucao_id, worker_id=worker_id)
+    )

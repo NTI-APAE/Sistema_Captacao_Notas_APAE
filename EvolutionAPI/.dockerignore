@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.log
+logs/
+diagnostico/
+test_*.py
+Dockerfile*
+docker-compose*.yml
+docker-compose*.yaml

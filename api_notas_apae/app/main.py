@@ -20,6 +20,9 @@ def create_app() -> FastAPI:
         title="API Notas APAE",
         version="0.1.0",
         description="Backend em camadas para captacao de notas fiscais.",
+        docs_url=None if settings.environment == "production" else "/docs",
+        redoc_url=None if settings.environment == "production" else "/redoc",
+        openapi_url=None if settings.environment == "production" else "/openapi.json",
     )
     register_exception_handlers(app)
     app.include_router(health_router)

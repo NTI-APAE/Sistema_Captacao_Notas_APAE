@@ -1,0 +1,204 @@
+name: apae-production
+
+x-api-environment: &api-environment
+  APP_ENV: production
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+  EVOLUTION_BASE_URL: http://evolution-api:8080
+  EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:?EVOLUTION_API_KEY is required}
+  EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:?EVOLUTION_INSTANCE is required}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  PRAZO_MAXIMO_EMISSAO_MESES: ${PRAZO_MAXIMO_EMISSAO_MESES:-3}
+  WORKER_API_KEY: ${WORKER_API_KEY:?WORKER_API_KEY is required}
+  WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+  WORKER_EXECUTION_TIMEOUT_MINUTES: ${WORKER_EXECUTION_TIMEOUT_MINUTES:-30}
+  WORKER_HEARTBEAT_INTERVAL_SECONDS: ${WORKER_HEARTBEAT_INTERVAL_SECONDS:-30}
+  WORKER_LEASE_TIMEOUT_SECONDS: ${WORKER_LEASE_TIMEOUT_SECONDS:-120}
+  NOTAS_API_INTERNAL_KEY: ${NOTAS_API_INTERNAL_KEY:?NOTAS_API_INTERNAL_KEY is required}
+  ADMIN_SESSION_COOKIE: ${ADMIN_SESSION_COOKIE:?ADMIN_SESSION_COOKIE is required}
+  ADMIN_SESSION_MINUTES: ${ADMIN_SESSION_MINUTES:-480}
+  ADMIN_COOKIE_SECURE: "true"
+
+services:
+  notes-db:
+    image: ${NOTES_DB_IMAGE:?NOTES_DB_IMAGE must be pinned}
+    environment:
+      POSTGRES_DB: ${NOTES_DB_NAME:?NOTES_DB_NAME is required}
+      POSTGRES_USER: ${NOTES_DB_USER:?NOTES_DB_USER is required}
+      POSTGRES_PASSWORD: ${NOTES_DB_PASSWORD:?NOTES_DB_PASSWORD is required}
+    volumes:
+      - notes_postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../../api_notas_apae
+      dockerfile: Dockerfile.production
+    environment: *api-environment
+    depends_on:
+      notes-db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    networks:
+      - app_internal
+      - edge
+    healthcheck:
+      test:
+        ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    restart: unless-stopped
+
+  migrate:
+    profiles: ["migration"]
+    build:
+      context: ../../api_notas_apae
+      dockerfile: Dockerfile.production
+    environment: *api-environment
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      notes-db:
+        condition: service_healthy
+    networks:
+      - app_internal
+    restart: "no"
+
+  webhook:
+    build:
+      context: ../../EvolutionAPI
+      dockerfile: Dockerfile.production
+    environment:
+      EVOLUTION_API_URL: http://evolution-api:8080
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:?EVOLUTION_INSTANCE is required}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:?EVOLUTION_API_KEY is required}
+      NOTAS_API_URL: http://api:8000
+      EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN:?EVOLUTION_WEBHOOK_TOKEN is required}
+      NOTAS_API_INTERNAL_KEY: ${NOTAS_API_INTERNAL_KEY:?NOTAS_API_INTERNAL_KEY is required}
+    depends_on:
+      api:
+        condition: service_healthy
+      evolution-api:
+        condition: service_healthy
+    expose:
+      - "8001"
+    networks:
+      - app_internal
+      - evolution_internal
+    healthcheck:
+      test:
+        ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../../dashboard_apae
+      dockerfile: Dockerfile.production
+    environment:
+      NODE_ENV: production
+      NOTAS_API_URL: http://api:8000
+      DASHBOARD_SESSION_COOKIE: ${ADMIN_SESSION_COOKIE:?ADMIN_SESSION_COOKIE is required}
+      DASHBOARD_SESSION_MINUTES: ${ADMIN_SESSION_MINUTES:-480}
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "3000"
+    networks:
+      - app_internal
+      - edge
+    healthcheck:
+      test:
+        ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+
+  evolution-db:
+    image: ${EVOLUTION_DB_IMAGE:?EVOLUTION_DB_IMAGE must be pinned}
+    environment:
+      POSTGRES_DB: ${EVOLUTION_DB_NAME:?EVOLUTION_DB_NAME is required}
+      POSTGRES_USER: ${EVOLUTION_DB_USER:?EVOLUTION_DB_USER is required}
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:?EVOLUTION_DB_PASSWORD is required}
+    volumes:
+      - evolution_postgres_data:/var/lib/postgresql/data
+    networks:
+      - evolution_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: ${REDIS_IMAGE:?REDIS_IMAGE must be pinned}
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - evolution_redis_data:/data
+    networks:
+      - evolution_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  evolution-api:
+    image: ${EVOLUTION_API_IMAGE:?EVOLUTION_API_IMAGE must be pinned to an approved tag or digest}
+    env_file:
+      - ${EVOLUTION_ENV_FILE:?EVOLUTION_ENV_FILE must point to an external secret/config file}
+    environment:
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${EVOLUTION_DB_USER}:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/${EVOLUTION_DB_NAME}
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/0
+    depends_on:
+      evolution-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - evolution_internal
+    healthcheck:
+      test:
+        ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8080/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  notes_postgres_data:
+  evolution_postgres_data:
+  evolution_redis_data:
+  evolution_instances:
+
+networks:
+  app_internal:
+    internal: true
+  evolution_internal:
+    internal: true
+  edge:

@@ -11,6 +11,36 @@ O diretório de trabalho costuma conter mudanças de implementação em andament
 use `git reset --hard`, `git checkout --` ou comandos destrutivos para "limpar" o
 estado sem autorização explícita.
 
+## Política de branches para novas funcionalidades
+
+Antes de implementar **qualquer nova feature**, crie uma branch Git exclusiva para a funcionalidade, a partir da branch-base apropriada (normalmente `main` ou `develop`, conforme o fluxo vigente do repositório).
+
+1. Execute `git status --short` e `git branch --show-current` para identificar a branch atual e alterações locais.
+2. Preserve integralmente alterações não commitadas. Se houver mudanças em andamento, não faça checkout, stash, reset ou outra operação que possa deslocá-las ou misturá-las sem antes apresentar uma estratégia segura e obter autorização do usuário.
+3. Confirme a branch-base apropriada e crie uma branch com nome descritivo no padrão `feature/<descricao-curta-em-kebab-case>`; por exemplo, `feature/recuperacao-execucoes-abandonadas`.
+4. **Não comece a modificar código da nova feature na branch-base.** Verifique que a nova branch está ativa antes da primeira edição.
+5. Uma feature por branch. Não reutilize branches de funcionalidades não relacionadas. Para correções isoladas, prefira `fix/<descricao-curta>`; para mudanças de infraestrutura, `chore/<descricao-curta>`.
+6. Não faça merge, push, rebase, force-push ou exclusão de branches sem autorização explícita.
+7. Ao concluir, informe o nome da branch, os arquivos alterados, os testes realizados e as pendências.
+
+Se a tarefa for **somente análise ou planejamento**, sem alteração de arquivos, não é necessário criar branch. Se a tarefa envolver criação ou alteração de arquivos versionados, aplique a política antes de editar.
+
+
+## Política de commits automáticos
+
+Ao implementar alterações em uma branch de trabalho, **crie commits Git automaticamente**, sem solicitar autorização a cada commit, desde que os arquivos pertençam à tarefa e as verificações pertinentes tenham sido executadas.
+
+1. Faça commits pequenos e coesos, preferencialmente por etapa funcional concluída; não acumule mudanças independentes em um único commit.
+2. Use mensagens no padrão **Conventional Commits**, como `feat(worker): adiciona controle de lease`, `fix(worker): evita reprocessamento indevido`, `test(worker): cobre recuperação de execuções` e `docs: atualiza procedimentos`.
+3. Antes de cada commit, revise `git status --short` e `git diff --check`; execute os testes e verificações aplicáveis. Se algum teste falhar ou não puder ser executado, informe o motivo e **não apresente o commit como validado**. Não faça commit de uma etapa com falha conhecida sem comunicar e obter autorização.
+4. Adicione ao stage **somente arquivos relacionados à tarefa**, explicitamente (`git add <arquivos>`). Não use `git add .` ou `git add -A` indiscriminadamente; preserve mudanças preexistentes e de terceiros.
+5. Nunca inclua `.env`, senhas, tokens, chaves, dados pessoais, dumps, logs sensíveis ou outros segredos. Confira o diff staged antes de commitar.
+6. **Não execute `git push`, `git merge`, `git rebase`, `git reset --hard`, `git commit --amend`, force-push ou exclusão de branches** sem autorização explícita. Não faça commits diretamente em `main` ou `develop`.
+7. Se não houver alterações a commitar, não crie commit vazio. Se a tarefa for apenas análise, não faça commits, salvo solicitação explícita para versionar um relatório.
+8. Ao final, informe branch, hashes curtos e mensagens dos commits, arquivos modificados, testes executados e pendências. Os commits devem permanecer **locais** até autorização para publicação.
+
+A criação automática de commits **não autoriza implementar além do escopo aprovado**. Se o usuário exigiu aprovação da proposta técnica antes de alterar arquivos, aguarde essa aprovação antes de editar e commitar.
+
 ## Visão geral
 
 O repositório é um monorepo operacional composto por quatro partes:
@@ -255,3 +285,4 @@ valide o cliente da API sem apontar para dados de produção.
 - [ ] Testes e verificações apropriados foram executados.
 - [ ] README ou documentação do componente foi atualizada se o fluxo mudou.
 - [ ] `git diff --check` não aponta whitespace inválido.
+- [ ] Commits locais da tarefa foram criados na branch correta, com arquivos revisados e sem segredos; hashes e testes foram informados.

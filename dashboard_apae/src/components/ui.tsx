@@ -78,7 +78,12 @@ export function StatusBadge({ value }: { value: string | null }) {
     ? "success"
     : value.startsWith("ERRO")
       ? "danger"
-      : ["DUPLICADA", "PAUSADA", "AGUARDANDO_CAPTCHA"].includes(value)
+      : [
+            "DUPLICADA",
+            "PAUSADA",
+            "AGUARDANDO_CAPTCHA",
+            "RESULTADO_DESCONHECIDO",
+          ].includes(value)
         ? "warning"
         : "neutral";
   return (

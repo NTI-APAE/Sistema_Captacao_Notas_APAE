@@ -14,6 +14,8 @@ from app.services.worker import (
     ConsultarExecucaoWorkerService,
     ObterProximaNotaParaProcessamentoService,
     RecuperarExecucoesExpiradasService,
+    RegistrarHeartbeatWorkerService,
+    RetomarExecucaoWorkerService,
 )
 
 
@@ -51,6 +53,7 @@ def get_obter_proxima_nota_worker_service(
     return ObterProximaNotaParaProcessamentoService(
         unit_of_work=unit_of_work,
         max_attempts=get_settings().worker_max_attempts,
+        lease_timeout_seconds=get_settings().worker_lease_timeout_seconds,
     )
 
 
@@ -58,6 +61,24 @@ def get_consultar_execucao_worker_service(
     unit_of_work: Annotated[Transaction, Depends(get_unit_of_work)],
 ) -> ConsultarExecucaoWorkerService:
     return ConsultarExecucaoWorkerService(unit_of_work=unit_of_work)
+
+
+def get_registrar_heartbeat_worker_service(
+    unit_of_work: Annotated[Transaction, Depends(get_unit_of_work)],
+) -> RegistrarHeartbeatWorkerService:
+    return RegistrarHeartbeatWorkerService(
+        unit_of_work=unit_of_work,
+        lease_timeout_seconds=get_settings().worker_lease_timeout_seconds,
+    )
+
+
+def get_retomar_execucao_worker_service(
+    unit_of_work: Annotated[Transaction, Depends(get_unit_of_work)],
+) -> RetomarExecucaoWorkerService:
+    return RetomarExecucaoWorkerService(
+        unit_of_work=unit_of_work,
+        lease_timeout_seconds=get_settings().worker_lease_timeout_seconds,
+    )
 
 
 def get_recuperar_execucoes_expiradas_service(

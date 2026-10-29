@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from app.domain.entities.execucao_cadastro import ExecucaoCadastro
 from app.domain.entities.nota_fiscal import NotaFiscal
+from app.domain.enums.execucao_fase import ExecucaoFase
 from app.domain.enums.execucao_status import ExecucaoStatus
 from app.domain.enums.nota_status import NotaStatus
 from app.domain.exceptions.resultado_execucao_conflitante_exception import (
@@ -18,6 +19,8 @@ from app.services.execucoes import (
 from app.services.worker import (
     ObterProximaNotaParaProcessamentoService,
     RecuperarExecucoesExpiradasService,
+    RegistrarHeartbeatWorkerService,
+    RetomarExecucaoWorkerService,
 )
 from tests.fixtures.fakes import FakeUnitOfWork
 
@@ -44,6 +47,10 @@ def test_claim_reserva_nota_pendente_e_cria_execucao() -> None:
     assert output.tentativa == 1
     assert uow.notas_store[nota.id].status == NotaStatus.CADASTRANDO
     assert len(uow.execucoes_store) == 1
+    execucao = next(iter(uow.execucoes_store.values()))
+    assert execucao.worker_id == "legacy-worker"
+    assert execucao.lease_expira_em is not None
+    assert execucao.fase_portal == ExecucaoFase.RESERVADA
     assert uow.commits == 1
 
 
@@ -182,4 +189,145 @@ def test_recupera_execucao_antiga_por_timeout() -> None:
     assert len(output) == 1
     assert uow.execucoes_store[execucao.id].status == ExecucaoStatus.ERRO
     assert uow.execucoes_store[recente.id].status == ExecucaoStatus.EM_EXECUCAO
-    assert uow.notas_store[nota.id].status == NotaStatus.ERRO_CADASTRO
+    assert uow.notas_store[nota.id].status == NotaStatus.PENDENTE
+
+
+def test_heartbeat_renova_lease_e_registra_inicio_do_portal() -> None:
+    uow = FakeUnitOfWork()
+    nota = NotaFiscal(chave=CHAVE, status=NotaStatus.CADASTRANDO)
+    execucao = ExecucaoCadastro(
+        nota_fiscal_id=nota.id,
+        tentativa=1,
+        status=ExecucaoStatus.EM_EXECUCAO,
+        worker_id="worker-a",
+        lease_expira_em=utc_now() + timedelta(seconds=10),
+    )
+    uow.notas_store[nota.id] = nota
+    uow.execucoes_store[execucao.id] = execucao
+
+    output = RegistrarHeartbeatWorkerService(uow, lease_timeout_seconds=120).execute(
+        execucao.id,
+        worker_id="worker-a",
+        fase=ExecucaoFase.PORTAL_INICIADO,
+    )
+
+    assert output.fase_portal == ExecucaoFase.PORTAL_INICIADO.value
+    assert uow.execucoes_store[execucao.id].efeito_externo_iniciado_em is not None
+    assert uow.execucoes_store[execucao.id].lease_expira_em > utc_now()
+    assert uow.commits == 1
+
+
+def test_retomar_mantem_a_mesma_tentativa() -> None:
+    uow = FakeUnitOfWork()
+    nota = NotaFiscal(chave=CHAVE, status=NotaStatus.PAUSADA)
+    execucao = ExecucaoCadastro(
+        nota_fiscal_id=nota.id,
+        tentativa=2,
+        status=ExecucaoStatus.PAUSADA,
+        fase_portal=ExecucaoFase.PAUSADA,
+        worker_id="worker-a",
+        lease_expira_em=utc_now() + timedelta(seconds=30),
+    )
+    uow.notas_store[nota.id] = nota
+    uow.execucoes_store[execucao.id] = execucao
+
+    output = RetomarExecucaoWorkerService(uow, lease_timeout_seconds=120).execute(
+        execucao.id,
+        worker_id="worker-a",
+    )
+
+    assert output.tentativa == 2
+    assert uow.execucoes_store[execucao.id].status == ExecucaoStatus.EM_EXECUCAO
+    assert uow.notas_store[nota.id].status == NotaStatus.CADASTRANDO
+
+
+def test_recupera_execucao_com_efeito_externo_sem_reenfileirar() -> None:
+    uow = FakeUnitOfWork()
+    nota = NotaFiscal(chave=CHAVE, status=NotaStatus.CADASTRANDO)
+    execucao = ExecucaoCadastro(
+        nota_fiscal_id=nota.id,
+        tentativa=1,
+        status=ExecucaoStatus.EM_EXECUCAO,
+        fase_portal=ExecucaoFase.PORTAL_INICIADO,
+        efeito_externo_iniciado_em=utc_now() - timedelta(minutes=45),
+        lease_expira_em=utc_now() - timedelta(minutes=1),
+    )
+    uow.notas_store[nota.id] = nota
+    uow.execucoes_store[execucao.id] = execucao
+
+    output = RecuperarExecucoesExpiradasService(uow, timeout_minutes=30).execute()
+
+    assert len(output) == 1
+    assert (
+        uow.execucoes_store[execucao.id].status
+        == ExecucaoStatus.RESULTADO_DESCONHECIDO
+    )
+    assert uow.notas_store[nota.id].status == NotaStatus.RESULTADO_DESCONHECIDO
+    assert not any(
+        item.status == NotaStatus.PENDENTE for item in uow.notas_store.values()
+    )
+
+    assert RecuperarExecucoesExpiradasService(uow, timeout_minutes=30).execute() == []
+
+
+def test_resultado_tardio_do_worker_exige_reconciliacao() -> None:
+    uow = FakeUnitOfWork()
+    nota = NotaFiscal(chave=CHAVE, status=NotaStatus.RESULTADO_DESCONHECIDO)
+    execucao = ExecucaoCadastro(
+        nota_fiscal_id=nota.id,
+        tentativa=1,
+        status=ExecucaoStatus.RESULTADO_DESCONHECIDO,
+        worker_id="worker-a",
+    )
+    uow.notas_store[nota.id] = nota
+    uow.execucoes_store[execucao.id] = execucao
+
+    service = RegistrarResultadoCadastroService(uow)
+    try:
+        service.execute(
+            RegistrarResultadoCadastroInput(
+                execucao_id=execucao.id,
+                status=ExecucaoStatus.SUCESSO,
+                worker_id="worker-a",
+            ),
+        )
+    except ResultadoExecucaoConflitanteException:
+        pass
+    else:
+        raise AssertionError("resultado tardio deveria exigir reconciliacao")
+
+    output = service.execute(
+        RegistrarResultadoCadastroInput(
+            execucao_id=execucao.id,
+            status=ExecucaoStatus.SUCESSO,
+            mensagem="confirmado no portal",
+        ),
+    )
+    assert output.status == ExecucaoStatus.SUCESSO
+    assert uow.notas_store[nota.id].status == NotaStatus.CADASTRADA
+
+
+def test_worker_pode_isolar_resultado_apos_falha_de_comunicacao() -> None:
+    uow = FakeUnitOfWork()
+    nota = NotaFiscal(chave=CHAVE, status=NotaStatus.CADASTRANDO)
+    execucao = ExecucaoCadastro(
+        nota_fiscal_id=nota.id,
+        tentativa=1,
+        status=ExecucaoStatus.EM_EXECUCAO,
+        worker_id="worker-a",
+        lease_expira_em=utc_now() + timedelta(seconds=30),
+    )
+    uow.notas_store[nota.id] = nota
+    uow.execucoes_store[execucao.id] = execucao
+
+    output = RegistrarResultadoCadastroService(uow).execute(
+        RegistrarResultadoCadastroInput(
+            execucao_id=execucao.id,
+            status=ExecucaoStatus.RESULTADO_DESCONHECIDO,
+            worker_id="worker-a",
+            mensagem="resposta perdida do portal",
+        ),
+    )
+
+    assert output.status == ExecucaoStatus.RESULTADO_DESCONHECIDO
+    assert uow.notas_store[nota.id].status == NotaStatus.RESULTADO_DESCONHECIDO

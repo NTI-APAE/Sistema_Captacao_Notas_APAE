@@ -64,7 +64,10 @@ class ApiNotasClient:
     def _worker_headers(self) -> dict[str, str]:
         if not config.NOTAS_API_WORKER_KEY:
             raise ApiNotasError("Configure WORKER_API_KEY para executar os cadastros.")
-        return {"X-Worker-API-Key": config.NOTAS_API_WORKER_KEY}
+        return {
+            "X-Worker-API-Key": config.NOTAS_API_WORKER_KEY,
+            "X-Worker-ID": config.WORKER_ID,
+        }
 
     def importar_chaves(
         self,
@@ -124,6 +127,38 @@ class ApiNotasClient:
             execucao_id=data["execucao_id"],
         )
 
+    def registrar_heartbeat(
+        self,
+        nota: Nota,
+        *,
+        fase: str | None = None,
+        mensagem: str | None = None,
+    ) -> None:
+        if not nota.execucao_id:
+            raise ApiNotasError("A nota não possui execução para renovar o lease.")
+        self._request(
+            "POST",
+            f"/worker/execucoes/{nota.execucao_id}/heartbeat",
+            payload={"fase": fase, "mensagem": mensagem},
+            headers=self._worker_headers(),
+        )
+
+    def retomar_execucao(self, nota: Nota) -> None:
+        if not nota.execucao_id:
+            raise ApiNotasError("A nota não possui execução para retomar.")
+        self._request(
+            "POST",
+            f"/worker/execucoes/{nota.execucao_id}/retomar",
+            headers=self._worker_headers(),
+        )
+
+    def consultar_execucao(self, execucao_id: str) -> dict[str, Any]:
+        return self._request(
+            "GET",
+            f"/worker/execucoes/{execucao_id}",
+            headers=self._worker_headers(),
+        )[1]
+
     def registrar_resultado(
         self,
         nota: Nota,
@@ -143,6 +178,7 @@ class ApiNotasClient:
             "ERRO": "ERRO",
             "AGUARDANDO_CAPTCHA": "AGUARDANDO_CAPTCHA",
             "PAUSADA": "PAUSADA",
+            "RESULTADO_DESCONHECIDO": "RESULTADO_DESCONHECIDO",
         }.get(status, status)
         self._request(
             "POST",
@@ -191,7 +227,15 @@ class ApiNotasClient:
     def listar_notas_operacao(self) -> list[Nota]:
         hoje = date.today().isoformat()
         notas = self.listar_notas()
-        fila = {"PENDENTE", "PROCESSANDO", "CADASTRANDO", "AGUARDANDO_CAPTCHA", "PAUSADA", "ERRO"}
+        fila = {
+            "PENDENTE",
+            "PROCESSANDO",
+            "CADASTRANDO",
+            "AGUARDANDO_CAPTCHA",
+            "PAUSADA",
+            "RESULTADO_DESCONHECIDO",
+            "ERRO",
+        }
         return [
             nota for nota in notas
             if nota.status in fila or (nota.criado_em and str(nota.criado_em)[:10] == hoje)
@@ -199,7 +243,15 @@ class ApiNotasClient:
 
     def contadores_operacao(self) -> dict[str, int]:
         notas = self.listar_notas()
-        fila = {"PENDENTE", "PROCESSANDO", "CADASTRANDO", "AGUARDANDO_CAPTCHA", "PAUSADA", "ERRO"}
+        fila = {
+            "PENDENTE",
+            "PROCESSANDO",
+            "CADASTRANDO",
+            "AGUARDANDO_CAPTCHA",
+            "PAUSADA",
+            "RESULTADO_DESCONHECIDO",
+            "ERRO",
+        }
         hoje = date.today().isoformat()
         return {
             "fila_pendente": sum(nota.status in fila for nota in notas),
@@ -223,7 +275,19 @@ class ApiNotasClient:
             duplicadas = [item for item in itens if item.status == "DUPLICADA"]
             erros = [item for item in itens if item.status in {"ERRO", "ERRO_CADASTRO"}]
             ignoradas = [item for item in itens if item.status == "IGNORADA"]
-            pendentes = [item for item in itens if item.status in {"PENDENTE", "CADASTRANDO", "PROCESSANDO", "AGUARDANDO_CAPTCHA", "PAUSADA"}]
+            pendentes = [
+                item
+                for item in itens
+                if item.status
+                in {
+                    "PENDENTE",
+                    "CADASTRANDO",
+                    "PROCESSANDO",
+                    "AGUARDANDO_CAPTCHA",
+                    "PAUSADA",
+                    "RESULTADO_DESCONHECIDO",
+                }
+            ]
             linhas.append(RelatorioDia(
                 data=dia,
                 cadastradas=len(cadastradas),

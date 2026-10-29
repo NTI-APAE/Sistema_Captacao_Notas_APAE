@@ -31,6 +31,11 @@ class ExecucaoCadastroResponse(BaseModel):
     iniciado_em: datetime | None
     finalizado_em: datetime | None
     criado_em: datetime
+    worker_id: str | None = None
+    ultimo_heartbeat_em: datetime | None = None
+    lease_expira_em: datetime | None = None
+    fase_portal: str = "RESERVADA"
+    motivo_recuperacao: str | None = None
 
     @classmethod
     def from_output(cls, output: ExecucaoCadastroOutput) -> "ExecucaoCadastroResponse":
@@ -46,4 +51,9 @@ class ExecucaoCadastroResponse(BaseModel):
             iniciado_em=output.iniciado_em,
             finalizado_em=output.finalizado_em,
             criado_em=output.criado_em,
+            worker_id=output.worker_id,
+            ultimo_heartbeat_em=output.ultimo_heartbeat_em,
+            lease_expira_em=output.lease_expira_em,
+            fase_portal=output.fase_portal.value,
+            motivo_recuperacao=output.motivo_recuperacao,
         )

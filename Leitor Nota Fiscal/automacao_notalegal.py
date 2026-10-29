@@ -24,6 +24,7 @@ from models import (
     STATUS_IGNORADA,
     STATUS_PAUSADA,
     STATUS_PENDENTE,
+    STATUS_RESULTADO_DESCONHECIDO,
 )
 
 
@@ -84,6 +85,10 @@ class AutomacaoNotaLegal:
         self._operacao_id = str(uuid4())
         self._valor_nota_em_processamento: float | None = None
         self._resultados_finais_sessao: dict[str, tuple[str, float | None]] = {}
+        self._heartbeat_thread: threading.Thread | None = None
+        self._heartbeat_stop = threading.Event()
+        self._heartbeat_fase: str | None = None
+        self._efeito_externo_iniciado = False
 
     @property
     def rodando(self) -> bool:
@@ -117,6 +122,15 @@ class AutomacaoNotaLegal:
             self._log("A automacao ja esta pausada.")
             return
         self._pause_event.clear()
+        if self._nota_em_processamento and self._nota_em_processamento.execucao_id:
+            try:
+                self.api_client.registrar_resultado(
+                    self._nota_em_processamento,
+                    STATUS_PAUSADA,
+                    "Pausa solicitada pelo operador.",
+                )
+            except Exception as exc:
+                self._log(f"Nao foi possivel registrar a pausa na API: {exc}", error=True)
         self._estado("PAUSADA")
         self._log("Automacao pausada pelo usuario.")
 
@@ -128,6 +142,11 @@ class AutomacaoNotaLegal:
             self._log("A automacao ja esta em execucao.")
             return
         self._pause_event.set()
+        if self._nota_em_processamento and self._nota_em_processamento.execucao_id:
+            try:
+                self.api_client.retomar_execucao(self._nota_em_processamento)
+            except Exception as exc:
+                self._log(f"Nao foi possivel retomar a execucao na API: {exc}", error=True)
         self._estado("EXECUTANDO")
         self._log("Automacao continuando.")
 
@@ -182,7 +201,7 @@ class AutomacaoNotaLegal:
 
                 while not self._stop_event.is_set():
                     self._aguardar_continuacao()
-                    nota = self.api_client.obter_proxima_nota()
+                    nota = self._obter_nota_para_processar()
                     if not nota:
                         self._estado("PROCESSO_CONCLUIDO")
                         self._log(
@@ -199,8 +218,15 @@ class AutomacaoNotaLegal:
                     if self._inicio_processamento_em is None:
                         self._inicio_processamento_em = time.perf_counter()
                     self._estado("EXECUTANDO")
-                    status_final, duracao_segundos = self._processar_nota(page, nota)
+                    self._nota_em_processamento = nota
+                    self._iniciar_heartbeat(nota)
+                    try:
+                        status_final, duracao_segundos = self._processar_nota(page, nota)
+                    finally:
+                        self._parar_heartbeat()
                     self._registrar_resultado_sessao(status_final, duracao_segundos, nota)
+                    if status_final:
+                        self._limpar_journal()
                     self._notas_processadas_lote += 1
                     self._aplicar_pausa_entre_notas()
 
@@ -495,6 +521,7 @@ class AutomacaoNotaLegal:
         data_emissao_nota: date | None = None
         self._nota_em_processamento = nota
         self._valor_nota_em_processamento = None
+        self._efeito_externo_iniciado = False
         self._log(f"Processando nota {nota.chave}.")
         try:
             self._voltar_se_estiver_em_resultado(page)
@@ -609,6 +636,7 @@ class AutomacaoNotaLegal:
                 return STATUS_IGNORADA, duracao_segundos
 
             self._salvar_diagnostico_pagina(page, nota, "antes_cadastrar")
+            self._marcar_fase(nota, "PORTAL_INICIADO")
             self._acionar_cadastro_e_aguardar_resultado(page)
             self._salvar_diagnostico_pagina(page, nota, "apos_resultado")
 
@@ -640,6 +668,13 @@ class AutomacaoNotaLegal:
             self._voltar_se_estiver_em_resultado(page)
             return status, duracao_segundos
         except Exception as exc:
+            if self._efeito_externo_iniciado:
+                self._log(
+                    "A comunicacao falhou depois do inicio potencial do cadastro; "
+                    "a execucao sera preservada para reconciliacao.",
+                    error=True,
+                )
+                raise
             mensagem_tela = self._ler_texto_body(page)
             if self._requisicoes_excessivas_detectadas(mensagem_tela):
                 self._pausar_por_requisicoes_excessivas(nota, mensagem_tela)
@@ -672,6 +707,112 @@ class AutomacaoNotaLegal:
 
     def _duracao_tentativa(self, inicio_tentativa: float) -> float:
         return round(max(0.0, time.perf_counter() - inicio_tentativa), 2)
+
+    def _obter_nota_para_processar(self) -> Nota | None:
+        journal = config.EXECUCAO_JOURNAL_PATH
+        if not journal.exists():
+            return self.api_client.obter_proxima_nota()
+        try:
+            dados = json.loads(journal.read_text(encoding="utf-8"))
+            execucao = self.api_client.consultar_execucao(dados["execucao_id"])
+            status = execucao.get("status")
+            if status in {"SUCESSO", "DUPLICADA", "IGNORADA", "ERRO"}:
+                self._limpar_journal()
+                return self.api_client.obter_proxima_nota()
+            if status == "RESULTADO_DESCONHECIDO":
+                raise RuntimeError(
+                    "A execução anterior exige reconciliação operacional antes de continuar."
+                )
+            if dados.get("fase") in {"PORTAL_INICIADO", "RESULTADO_ENVIANDO"}:
+                raise RuntimeError(
+                    "A execução anterior pode ter produzido efeito no portal; "
+                    "reconcilie-a antes de tentar novamente."
+                )
+            expiracao = execucao.get("lease_expira_em")
+            if expiracao:
+                momento_expiracao = datetime.fromisoformat(expiracao.replace("Z", "+00:00"))
+                if momento_expiracao <= datetime.now(momento_expiracao.tzinfo):
+                    raise RuntimeError(
+                        "A execução anterior perdeu o lease; aguarde a recuperação antes de continuar."
+                    )
+            return Nota(
+                id=dados["nota_id"],
+                chave=dados["chave"],
+                status="PROCESSANDO",
+                mensagem="Execução retomada após reinicialização.",
+                arquivo_origem="API",
+                data_importacao=None,
+                data_cadastro=None,
+                tentativa=int(dados["tentativa"]),
+                criado_em=None,
+                atualizado_em=None,
+                execucao_id=dados["execucao_id"],
+            )
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"Não foi possível consultar a execução persistida: {exc}"
+            ) from exc
+
+    def _iniciar_heartbeat(self, nota: Nota) -> None:
+        self._salvar_journal(nota)
+        self._heartbeat_stop.clear()
+        self._heartbeat_fase = None
+        self._heartbeat_thread = threading.Thread(
+            target=self._executar_heartbeat,
+            args=(nota,),
+            daemon=True,
+            name="worker-heartbeat",
+        )
+        self._heartbeat_thread.start()
+
+    def _parar_heartbeat(self) -> None:
+        self._heartbeat_stop.set()
+        if self._heartbeat_thread and self._heartbeat_thread.is_alive():
+            self._heartbeat_thread.join(timeout=2)
+        self._heartbeat_thread = None
+
+    def _executar_heartbeat(self, nota: Nota) -> None:
+        intervalo = max(5.0, config.WORKER_HEARTBEAT_INTERVAL_SEGUNDOS)
+        while not self._heartbeat_stop.wait(intervalo):
+            try:
+                self.api_client.registrar_heartbeat(
+                    nota,
+                    fase=self._heartbeat_fase,
+                )
+            except Exception as exc:
+                self._log(f"Falha ao renovar lease da execução: {exc}", error=True)
+
+    def _marcar_fase(self, nota: Nota, fase: str, mensagem: str | None = None) -> None:
+        self.api_client.registrar_heartbeat(nota, fase=fase, mensagem=mensagem)
+        self._heartbeat_fase = fase
+        if fase == "PORTAL_INICIADO":
+            self._efeito_externo_iniciado = True
+        self._salvar_journal(nota, fase=fase)
+
+    def _salvar_journal(self, nota: Nota, *, fase: str | None = None) -> None:
+        caminho = config.EXECUCAO_JOURNAL_PATH
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        caminho.write_text(
+            json.dumps(
+                {
+                    "nota_id": str(nota.id),
+                    "execucao_id": nota.execucao_id,
+                    "chave": nota.chave,
+                    "tentativa": nota.tentativa,
+                    "fase": fase or self._heartbeat_fase,
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+    def _limpar_journal(self) -> None:
+        try:
+            config.EXECUCAO_JOURNAL_PATH.unlink(missing_ok=True)
+        except OSError as exc:
+            self._log(f"Nao foi possivel remover o journal local: {exc}", error=True)
 
     def _reiniciar_resumo_operacao(self) -> None:
         self._operacao_id = str(uuid4())
@@ -993,7 +1134,21 @@ class AutomacaoNotaLegal:
             self._resumir_mensagem(mensagem, 800),
             db_path=self.db_path,
         )
+        self._marcar_fase(nota, "PAUSADA", self._resumir_mensagem(mensagem, 800))
         self._notificar_nota(nota.id)
+
+        if self._efeito_externo_iniciado:
+            self.api_client.registrar_resultado(
+                nota,
+                STATUS_RESULTADO_DESCONHECIDO,
+                "O portal encerrou a sessao depois do inicio do cadastro; "
+                "reconciliacao manual necessaria.",
+            )
+            self._estado("RESULTADO_DESCONHECIDO")
+            raise RuntimeError(
+                "O resultado do portal ficou desconhecido; reconcilie a execucao "
+                "antes de continuar."
+            )
 
         pausa = getattr(config, "PAUSA_REQUISICOES_EXCESSIVAS_SEGUNDOS", 300)
         self._estado("SESSAO_ENCERRADA")
@@ -1009,12 +1164,8 @@ class AutomacaoNotaLegal:
         self._pause_event.clear()
         self._aguardar_continuacao()
 
-        self._atualizar_status_nota(
-            nota.id,
-            STATUS_PENDENTE,
-            "Retomando apos pausa por requisicoes excessivas.",
-            db_path=self.db_path,
-        )
+        self.api_client.retomar_execucao(nota)
+        self._heartbeat_fase = "PORTAL_INICIADO" if self._efeito_externo_iniciado else None
         self._notificar_nota(nota.id)
 
     def _aplicar_pausa_entre_notas(self) -> None:
@@ -1489,6 +1640,11 @@ class AutomacaoNotaLegal:
             "Aguardando resolucao manual de CAPTCHA/validacao.",
             db_path=self.db_path,
         )
+        self._marcar_fase(
+            nota,
+            "AGUARDANDO_CAPTCHA",
+            "Aguardando resolucao manual de CAPTCHA/validacao.",
+        )
         self._notificar_nota(nota.id)
         self._pause_event.clear()
         self._estado("AGUARDANDO_CAPTCHA")
@@ -1497,12 +1653,8 @@ class AutomacaoNotaLegal:
             "Continuar para prosseguir."
         )
         self._aguardar_continuacao()
-        self._atualizar_status_nota(
-            nota.id,
-            STATUS_PENDENTE,
-            "Validacao manual resolvida; retomando.",
-            db_path=self.db_path,
-        )
+        self.api_client.retomar_execucao(nota)
+        self._heartbeat_fase = "PORTAL_INICIADO" if self._efeito_externo_iniciado else None
         self._notificar_nota(nota.id)
 
     def _ler_mensagem(self, page: Page) -> str:

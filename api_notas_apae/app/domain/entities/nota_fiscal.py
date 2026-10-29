@@ -33,7 +33,6 @@ class NotaFiscal:
                 NotaStatus.PENDENTE,
                 NotaStatus.ERRO_CADASTRO,
                 NotaStatus.IGNORADA,
-                NotaStatus.PAUSADA,
             },
         )
 
@@ -53,6 +52,7 @@ class NotaFiscal:
                 NotaStatus.CADASTRANDO,
                 NotaStatus.AGUARDANDO_CAPTCHA,
                 NotaStatus.PAUSADA,
+                NotaStatus.RESULTADO_DESCONHECIDO,
             },
         )
 
@@ -64,6 +64,7 @@ class NotaFiscal:
                 NotaStatus.CADASTRANDO,
                 NotaStatus.AGUARDANDO_CAPTCHA,
                 NotaStatus.PAUSADA,
+                NotaStatus.RESULTADO_DESCONHECIDO,
             },
         )
 
@@ -75,6 +76,7 @@ class NotaFiscal:
                 NotaStatus.CADASTRANDO,
                 NotaStatus.AGUARDANDO_CAPTCHA,
                 NotaStatus.PAUSADA,
+                NotaStatus.RESULTADO_DESCONHECIDO,
             },
         )
 
@@ -86,6 +88,7 @@ class NotaFiscal:
                 NotaStatus.CADASTRANDO,
                 NotaStatus.AGUARDANDO_CAPTCHA,
                 NotaStatus.PAUSADA,
+                NotaStatus.RESULTADO_DESCONHECIDO,
             },
         )
 
@@ -94,6 +97,24 @@ class NotaFiscal:
         self._alterar_status(
             NotaStatus.ERRO_CADASTRO,
             permitidos={NotaStatus.CADASTRANDO},
+        )
+
+    def marcar_resultado_desconhecido(self, mensagem: str | None = None) -> None:
+        self.mensagem_status = mensagem
+        self._alterar_status(
+            NotaStatus.RESULTADO_DESCONHECIDO,
+            permitidos={
+                NotaStatus.PENDENTE,
+                NotaStatus.CADASTRANDO,
+                NotaStatus.AGUARDANDO_CAPTCHA,
+                NotaStatus.PAUSADA,
+            },
+        )
+
+    def retomar_cadastro(self) -> None:
+        self._alterar_status(
+            NotaStatus.CADASTRANDO,
+            permitidos={NotaStatus.AGUARDANDO_CAPTCHA, NotaStatus.PAUSADA},
         )
 
     def marcar_aguardando_captcha(self, mensagem: str | None = None) -> None:

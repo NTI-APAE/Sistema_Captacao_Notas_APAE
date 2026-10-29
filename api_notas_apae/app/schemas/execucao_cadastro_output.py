@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from app.domain.entities.execucao_cadastro import ExecucaoCadastro
+from app.domain.enums.execucao_fase import ExecucaoFase
 from app.domain.enums.execucao_status import ExecucaoStatus
 
 
@@ -20,6 +21,11 @@ class ExecucaoCadastroOutput:
     iniciado_em: datetime | None
     finalizado_em: datetime | None
     criado_em: datetime
+    worker_id: str | None
+    ultimo_heartbeat_em: datetime | None
+    lease_expira_em: datetime | None
+    fase_portal: ExecucaoFase
+    motivo_recuperacao: str | None
 
     @classmethod
     def from_domain(cls, execucao: ExecucaoCadastro) -> "ExecucaoCadastroOutput":
@@ -35,4 +41,9 @@ class ExecucaoCadastroOutput:
             iniciado_em=execucao.iniciado_em,
             finalizado_em=execucao.finalizado_em,
             criado_em=execucao.criado_em,
+            worker_id=execucao.worker_id,
+            ultimo_heartbeat_em=execucao.ultimo_heartbeat_em,
+            lease_expira_em=execucao.lease_expira_em,
+            fase_portal=execucao.fase_portal,
+            motivo_recuperacao=execucao.motivo_recuperacao,
         )
